@@ -1,0 +1,16 @@
+{
+  "name": "postulatrack",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "npm run dev --workspace @postulatrack/web",
+    "dev:api": "npm run dev --workspace @postulatrack/api",
+    "clean": "node scripts/clean.mjs",
+    "build": "npm run clean && npm run build --workspace @postulatrack/contracts && npm run build --workspace @postulatrack/api && npm run build --workspace @postulatrack/web",
+    "typecheck": "npm run build --workspace @postulatrack/contracts && npm run typecheck --workspace @postulatrack/api && npm run typecheck --workspace @postulatrack/web",
+    "admin:create": "npm run admin:create --workspace @postulatrack/api --"
+  },
+  "engines": { "node": ">=22.13.0" }
+}
