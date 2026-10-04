@@ -12,6 +12,7 @@ const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   API_PORT: z.coerce.number().default(4000),
   WEB_ORIGIN: z.string().url().default("http://localhost:3000"),
+  TRUST_PROXY: booleanFromString,
   SQLSERVER_HOST: z.string().min(1),
   SQLSERVER_PORT: z.coerce.number().default(1433),
   SQLSERVER_DATABASE: z.string().default("PostulaTrack"),
@@ -21,6 +22,7 @@ const schema = z.object({
   SQLSERVER_TRUST_CERTIFICATE: booleanFromString,
   SESSION_COOKIE_NAME: z.string().default("pt_session"),
   SESSION_HOURS: z.coerce.number().min(1).max(168).default(8),
+  JOOBLE_PE_API_KEY: z.string().optional(),
 })
 
 const parsed = schema.safeParse(process.env)

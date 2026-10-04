@@ -74,6 +74,11 @@ export async function createApplication(userId: string, input: ApplicationInput)
       INSERT INTO app.ApplicationStatusHistory(ApplicationId, PreviousStatusId, NewStatusId, ChangedByUserId, Comment)
       SELECT @ApplicationId, NULL, StatusId, @UserId, N'Proceso creado.' FROM app.ApplicationStatuses WHERE Code='REGISTERED';
     `)
+    await new sql.Request(transaction)
+      .input("UserId", sql.UniqueIdentifier, userId)
+      .input("ApplicationId", sql.NVarChar(80), String(applicationId))
+      .query(`INSERT INTO audit.AuditLog(UserId, ActionCode, EntityType, EntityId, ResultCode)
+              VALUES(@UserId, 'APPLICATION_CREATED', 'Application', @ApplicationId, 'SUCCESS');`)
     await transaction.commit()
     return Number(applicationId)
   } catch (error) {

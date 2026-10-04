@@ -42,6 +42,7 @@ import {
 
 const principal = [
   { href: "/", label: "Resumen", icon: LayoutDashboard },
+  { href: "/empleos", label: "Buscar empleos", icon: Search },
   { href: "/oportunidades", label: "Oportunidades", icon: BriefcaseBusiness },
   { href: "/postulaciones", label: "Postulaciones", icon: FileClock },
 ]

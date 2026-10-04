@@ -18,6 +18,7 @@ Base local: `http://localhost:4000/api`. Las rutas protegidas utilizan la cookie
 | `GET` | `/applications/:id` | Sesión | Consultar detalle e historial propios. |
 | `POST` | `/applications/:id/status` | Sesión | Registrar cambio de estado. |
 | `GET` | `/dashboard` | Sesión | Obtener indicadores propios. |
+| `GET` | `/jobs?keywords=&location=&page=` | Sesión | Buscar en Jooble Perú; 503 si falta clave, sin escribir en SQL. |
 | `GET` | `/admin/users` | ADMIN | Listar cuentas. |
 | `PATCH` | `/admin/users/:id/status` | ADMIN | Activar o desactivar cuenta. |
 | `GET` | `/admin/audit` | ADMIN | Consultar auditoría. |

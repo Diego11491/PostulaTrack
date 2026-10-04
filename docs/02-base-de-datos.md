@@ -34,6 +34,8 @@ erDiagram
 
 El procedimiento `app.ChangeApplicationStatus` bloquea la fila, valida propietario y estado, actualiza el proceso, inserta el historial y registra auditoría dentro de la misma transacción.
 
+La migración `database/003_owner_integrity.sql` agrega claves foráneas compuestas `(Id, OwnerUserId)` para que SQL Server también rechace relaciones entre propietarios distintos. La creación de oportunidades y postulaciones, y el archivado de oportunidades, registran auditoría dentro de su propia transacción. Ver el [modelo completo, sus fechas y límites](14-MODELO-DE-DATOS-Y-AUDITORIA.md) y ejecutar `database/004_verify_traceability.sql` tras la migración.
+
 ## Alta escala
 
 - Índices compuestos por propietario, estado y fecha.

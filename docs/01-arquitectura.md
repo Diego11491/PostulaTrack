@@ -1,29 +1,21 @@
 # Arquitectura de PostulaTrack
 
+**Estado:** monolito modular local de web y API, con SQL Server como única base autoritativa. El objetivo es una aplicación web útil y desplegable; los servicios Azure del documento 05 son opcionales y aún no están desplegados. Véase [estado y evidencia](07-ESTADO-Y-EVIDENCIA.md).
+
 ## Decisión tecnológica
 
 Se usa TypeScript en frontend y backend para compartir contratos y detectar errores antes de ejecutar. Next.js y React permiten una interfaz mantenible; Express mantiene la API desacoplada; SQL Server aporta relaciones, restricciones, transacciones e índices adecuados para preservar trazabilidad.
 
 ```mermaid
-flowchart TB
-  subgraph Cliente
-    UI[Next.js y React]
-  end
-  subgraph Servidor
-    API[Express API]
-    AUTH[Sesiones y roles]
-    RULES[Reglas de negocio]
-  end
-  subgraph Datos
-    SQL[(SQL Server)]
-    AUDIT[Auditoría]
-  end
-  UI -->|JSON y cookie segura| API
-  API --> AUTH
-  API --> RULES
-  AUTH --> SQL
-  RULES --> SQL
-  SQL --> AUDIT
+flowchart TD
+  U["Postulante o ADMIN"] --> WEB["Next.js en navegador"]
+  WEB -->|"JSON y cookie de sesión"| API["API Express"]
+  API --> AUTH["Autenticación y propietario"]
+  API --> DOM["Oportunidades y procesos"]
+  AUTH --> DB[("SQL Server")]
+  DOM --> DB
+  DB --> HIST["Historial y auditoría"]
+  API -->|"Búsqueda opcional"| JOBS["Jooble Perú"]
 ```
 
 ## Capas
@@ -43,6 +35,14 @@ flowchart TB
 4. La API valida propietario y datos, y usa parámetros SQL.
 5. Cada cambio de estado se ejecuta dentro de una transacción.
 6. El estado actual se actualiza y el historial se inserta sin sobrescribir registros anteriores.
+
+## Límites y decisiones
+
+- Web muestra estado, API aplica autorización y validación, SQL Server confirma la transacción; los contratos Zod compartidos reducen diferencias de formato.
+- API y SQL Server forman un único núcleo operacional. No añadir cola, ML, GenAI o microservicios solo para ampliar el diagrama: no resuelven hoy el seguimiento del postulante.
+- Las pantallas `agenda` y `empresas` contienen ejemplos estáticos y no están en el flujo autoritativo.
+- La búsqueda `GET /api/jobs` usa una API externa opcional; solo el usuario puede guardar una oferta y convertirla luego en proceso. Ver [ADR-004](decisions/004-busqueda-externa.md).
+- Despliegue público, backup, observabilidad y rendimiento con muchos usuarios requieren prueba propia. Ver [decisiones](decisions/README.md) y [fuente de verdad](09-FUENTE-DE-VERDAD.md).
 
 ## Camino hacia Azure
 

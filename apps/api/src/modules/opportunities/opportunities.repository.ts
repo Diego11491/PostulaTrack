@@ -78,6 +78,19 @@ export async function createOpportunity(userId: string, input: OpportunityInput)
         `)
     }
 
+    await new sql.Request(transaction)
+      .input("UserId", sql.UniqueIdentifier, userId)
+      .input("OpportunityId", sql.NVarChar(80), String(opportunityId))
+      .query(`INSERT INTO audit.AuditLog(UserId, ActionCode, EntityType, EntityId, ResultCode)
+              VALUES(@UserId, 'OPPORTUNITY_CREATED', 'Opportunity', @OpportunityId, 'SUCCESS');`)
+    if (applicationId !== null) {
+      await new sql.Request(transaction)
+        .input("UserId", sql.UniqueIdentifier, userId)
+        .input("ApplicationId", sql.NVarChar(80), String(applicationId))
+        .query(`INSERT INTO audit.AuditLog(UserId, ActionCode, EntityType, EntityId, ResultCode)
+                VALUES(@UserId, 'APPLICATION_CREATED', 'Application', @ApplicationId, 'SUCCESS');`)
+    }
+
     await transaction.commit()
     return { opportunityId: Number(opportunityId), applicationId: applicationId ? Number(applicationId) : null }
   } catch (error) {
@@ -91,8 +104,21 @@ export async function deleteOpportunity(userId: string, opportunityId: number) {
   const result = await pool.request()
     .input("UserId", sql.UniqueIdentifier, userId)
     .input("OpportunityId", sql.BigInt, opportunityId)
-    .query(`UPDATE app.Opportunities SET IsDeleted=1, UpdatedAtUtc=SYSUTCDATETIME()
-            WHERE OpportunityId=@OpportunityId AND OwnerUserId=@UserId AND IsDeleted=0;
-            SELECT @@ROWCOUNT AS Affected;`)
+    .query(`SET XACT_ABORT ON;
+            BEGIN TRY
+              BEGIN TRANSACTION;
+              UPDATE app.Opportunities SET IsDeleted=1, UpdatedAtUtc=SYSUTCDATETIME()
+              WHERE OpportunityId=@OpportunityId AND OwnerUserId=@UserId AND IsDeleted=0;
+              DECLARE @Affected INT = @@ROWCOUNT;
+              IF @Affected=1
+                INSERT INTO audit.AuditLog(UserId, ActionCode, EntityType, EntityId, ResultCode)
+                VALUES(@UserId, 'OPPORTUNITY_ARCHIVED', 'Opportunity', CONVERT(NVARCHAR(80), @OpportunityId), 'SUCCESS');
+              COMMIT TRANSACTION;
+              SELECT @Affected AS Affected;
+            END TRY
+            BEGIN CATCH
+              IF @@TRANCOUNT>0 ROLLBACK TRANSACTION;
+              THROW;
+            END CATCH;`)
   return result.recordset[0].Affected > 0
 }

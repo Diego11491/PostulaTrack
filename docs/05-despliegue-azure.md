@@ -1,5 +1,7 @@
 # Despliegue futuro en Azure
 
+**Opcional y no ejecutado en el ZIP revisado.** El MVP evaluable corre localmente con SQL Server. Elegir nube solo cuando se necesite acceso remoto, operación continua o un entorno de evaluación compartido; primero estimar costo mensual y comprobar el plan de despliegue.
+
 ## Arquitectura propuesta
 
 ```mermaid
@@ -15,7 +17,7 @@ flowchart TB
 
 ## Estrategia híbrida
 
-Durante desarrollo, SQL Server, web y API funcionan localmente. En producción, los tres componentes se migran a servicios administrados. Una fase híbrida puede mantener la base local solo para pruebas, nunca exponerla directamente a Internet.
+Durante desarrollo, SQL Server, web y API funcionan localmente. Si se decide alojar el producto, la web, API y base pueden migrarse a servicios administrados. Una fase de pruebas puede conservar la base local, pero no se debe anunciar como despliegue de producción ni exponer SQL Server directamente a Internet.
 
 ## Pasos de migración
 
@@ -23,7 +25,7 @@ Durante desarrollo, SQL Server, web y API funcionan localmente. En producción, 
 2. Crear una identidad administrada o credencial de mínimo privilegio.
 3. Guardar secretos en Key Vault.
 4. Publicar API y configurar `WEB_ORIGIN`, cifrado SQL y HTTPS.
-5. Publicar Next.js con `NEXT_PUBLIC_API_URL` apuntando a la API.
+5. Publicar Next.js con `NEXT_PUBLIC_API_URL` apuntando a la API; verificar origen, cookie `Secure`, HTTPS y comportamiento entre dominios antes de usar autenticación real.
 6. Restringir red entre API y SQL mediante endpoints privados cuando el presupuesto lo permita.
 7. Activar Application Insights, alertas, copias de seguridad y pruebas de restauración.
 

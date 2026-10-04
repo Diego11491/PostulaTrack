@@ -14,6 +14,8 @@
 - Consultas SQL parametrizadas.
 - Autorización por rol y por propietario.
 - Auditoría de cambios de estado y acciones administrativas.
+- Integración Jooble con host fijo, clave solo en servidor, búsqueda limitada por tasa y caché de diez minutos; fallos externos no exponen la clave.
+- Confianza en cabeceras de proxy desactivada por defecto (`TRUST_PROXY=false`); habilitarla solo detrás de proxy propio.
 - La cuenta SQL de aplicación no recibe `DELETE` ni permisos de definición de esquema.
 
 ## Responsabilidad por capas
@@ -31,3 +33,5 @@
 ## Antes de producción
 
 Habilitar HTTPS obligatorio, secretos en Azure Key Vault, rotación de credenciales, MFA para administradores, recuperación de contraseña verificada, análisis de dependencias, pruebas OWASP y alertas de Application Insights. La pantalla de seguridad muestra algunas capacidades futuras, pero MFA no forma parte del incremento actual.
+
+Ver [seguridad y estrategia de pruebas](13-SEGURIDAD-Y-PRUEBAS.md). SAST, SCA y pruebas de autorización cumplen propósitos distintos y no deben declararse como ejecutados sin sus resultados.
