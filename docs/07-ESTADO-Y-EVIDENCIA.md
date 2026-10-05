@@ -25,6 +25,13 @@
 4. Oportunidad → postulación → cambio de estado → historial tras recargar; error SQL provocado en ambiente de pruebas no deja estado e historial desalineados.
 5. Pantallas que aparecen en la demo consumen la API o están rotuladas como prototipo.
 
+`database/004_verify_traceability.sql` devuelve una muestra de discrepancias y ahora
+detiene la verificación con el error `51011` si alguna postulación activa tiene
+un estado distinto al último registro de su historial. Ejecutarlo en SQL Server
+después de instalar `003_owner_integrity.sql`; conservar la salida como evidencia.
+La API ordena ese historial por `HistoryId DESC`, para que dos cambios dentro
+del mismo segundo mantengan un orden estable.
+
 ## Plantilla breve de evidencia
 
 | Fecha | Entorno y versión | Escenario | Comando/pasos | Esperado | Observado | Resultado | Responsable |

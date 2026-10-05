@@ -40,7 +40,7 @@ export async function getApplication(userId: string, applicationId: number) {
     JOIN app.Profiles p ON p.UserId=h.ChangedByUserId
     JOIN app.Applications a ON a.ApplicationId=h.ApplicationId AND a.OwnerUserId=@UserId
     WHERE h.ApplicationId=@ApplicationId
-    ORDER BY h.ChangedAtUtc DESC;
+    ORDER BY h.HistoryId DESC;
   `)
   const sets = result.recordsets as unknown as Array<Array<Record<string, unknown>>>
   if (!sets[0]?.length) return null
