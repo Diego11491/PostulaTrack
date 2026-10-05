@@ -10,7 +10,7 @@ profileRouter.use(authenticate)
 profileRouter.get("/", asyncHandler(async (req, res) => {
   const pool = await getPool()
   const result = await pool.request().input("UserId", sql.UniqueIdentifier, req.user!.userId).query(`
-    SELECT FirstName, LastName, Phone, City, Headline, ProfessionalSummary,
+    SELECT FirstName, LastName, Phone, Country, City, Headline, ProfessionalSummary,
            Institution, Career, GraduationYear, UpdatedAtUtc
     FROM app.Profiles WHERE UserId = @UserId;
   `)
@@ -28,6 +28,7 @@ profileRouter.put("/", asyncHandler(async (req, res) => {
     .input("FirstName", sql.NVarChar(80), data.firstName)
     .input("LastName", sql.NVarChar(120), data.lastName)
     .input("Phone", sql.NVarChar(25), data.phone ?? null)
+    .input("Country", sql.NVarChar(100), data.country ?? null)
     .input("City", sql.NVarChar(100), data.city ?? null)
     .input("Headline", sql.NVarChar(180), data.headline ?? null)
     .input("ProfessionalSummary", sql.NVarChar(1000), data.professionalSummary ?? null)
@@ -35,7 +36,7 @@ profileRouter.put("/", asyncHandler(async (req, res) => {
     .input("Career", sql.NVarChar(160), data.career ?? null)
     .input("GraduationYear", sql.SmallInt, data.graduationYear ?? null)
     .query(`
-      UPDATE app.Profiles SET FirstName=@FirstName, LastName=@LastName, Phone=@Phone, City=@City,
+      UPDATE app.Profiles SET FirstName=@FirstName, LastName=@LastName, Phone=@Phone, Country=@Country, City=@City,
         Headline=@Headline, ProfessionalSummary=@ProfessionalSummary, Institution=@Institution,
         Career=@Career, GraduationYear=@GraduationYear, UpdatedAtUtc=SYSUTCDATETIME()
       WHERE UserId=@UserId;

@@ -10,7 +10,7 @@
     "clean": "node scripts/clean.mjs",
     "build": "npm run clean && npm run build --workspace @postulatrack/contracts && npm run build --workspace @postulatrack/api && npm run build --workspace @postulatrack/web",
     "typecheck": "npm run build --workspace @postulatrack/contracts && npm run typecheck --workspace @postulatrack/api && npm run typecheck --workspace @postulatrack/web",
-    "test": "npm run test --workspace @postulatrack/api",
+    "test": "npm run build --workspace @postulatrack/contracts && npm run test --workspace @postulatrack/api",
     "admin:create": "npm run admin:create --workspace @postulatrack/api --"
   },
   "engines": { "node": ">=22.13.0" }

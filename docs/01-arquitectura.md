@@ -2,6 +2,8 @@
 
 **Estado:** monolito modular local de web y API, con SQL Server como única base autoritativa. El objetivo es una aplicación web útil y desplegable; los servicios Azure del documento 05 son opcionales y aún no están desplegados. Véase [estado y evidencia](07-ESTADO-Y-EVIDENCIA.md).
 
+El repositorio **ya es un monorepo**: `apps/web`, `apps/api`, `packages/contracts`. Son procesos independientes en desarrollo y pueden publicarse como dos artefactos separados. Renombrarlos a `frontend` y `backend` no cambia acoplamiento ni latencia. Los contratos compartidos y la autorización en la API evitan duplicar reglas; el navegador nunca se conecta directamente a SQL Server.
+
 ## Decisión tecnológica
 
 Se usa TypeScript en frontend y backend para compartir contratos y detectar errores antes de ejecutar. Next.js y React permiten una interfaz mantenible; Express mantiene la API desacoplada; SQL Server aporta relaciones, restricciones, transacciones e índices adecuados para preservar trazabilidad.
@@ -43,6 +45,7 @@ flowchart TD
 - Las pantallas `agenda` y `empresas` contienen ejemplos estáticos y no están en el flujo autoritativo.
 - La búsqueda `GET /api/jobs` usa una API externa opcional; solo el usuario puede guardar una oferta y convertirla luego en proceso. Ver [ADR-004](decisions/004-busqueda-externa.md).
 - Despliegue público, backup, observabilidad y rendimiento con muchos usuarios requieren prueba propia. Ver [decisiones](decisions/README.md) y [fuente de verdad](09-FUENTE-DE-VERDAD.md).
+- Los catálogos cortos de país y carrera son sugerencias locales de la UI, con opción `Otro`; la API persiste el valor libre validado. Una API de catálogo tendría sentido cuando se necesiten códigos normalizados, localización, administración o sincronización con un proveedor.
 
 ## Camino hacia Azure
 

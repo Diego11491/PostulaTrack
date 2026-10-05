@@ -10,6 +10,7 @@
 | 3. Preparación | CV versionado y documentos privados, vínculos a candidaturas | Saber qué versión se envió a cada empresa | Almacenamiento privado, permisos por propietario y restauración probada. |
 | 4. Aprendizaje personal | Cohortes y embudo de etapas con definiciones estables | Detectar dónde se estanca la búsqueda | Métricas verificadas contra historial y muestras suficientes. |
 | 5. Acceso remoto | Despliegue único con backups, monitoreo y costo acotado | Uso fuera del equipo local | Prueba de recuperación, seguridad y presupuesto real. |
+| 6. Reclutamiento, sujeto a validación | Organizaciones y reclutadores publican vacantes; candidatos comparten su postulación por consentimiento | Conectar seguimiento privado con oportunidades reales | Modelo de organizaciones, aislamiento probado, consentimiento y auditoría; no se afirma implementado. |
 
 ## No poner todo en el MVP
 
@@ -21,6 +22,7 @@ Importar ofertas automáticamente puede violar condiciones de portales o crear r
 - Separación web/API y contratos versionados: cambios de UI no deben alterar la verdad en SQL Server.
 - Operación: métricas de error, tiempos de respuesta, backup/restauración y costo por usuario activo antes de prometer escala.
 - Privacidad: ADMIN gestiona acceso, no perfiles y postulaciones de todos; tableros agregados institucionales solo tras acuerdo explícito de finalidad y consentimiento.
+- Separar despliegues de Next.js y Express cuando haga falta escalar cada uno; medir p95 de consultas, índices, paginación y carga real antes de agregar caché o nuevos servicios. Conserva el monorepo y prueba los contratos juntos en CI.
 
 ## Decisión para la siguiente reunión con la profesora
 

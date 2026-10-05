@@ -11,3 +11,7 @@ Atiende incidencias de acceso, lista cuentas, las activa o desactiva y revisa au
 ## Principio aplicado
 
 El sistema sigue mínimo privilegio. Ser administrador no equivale a ser propietario de los datos laborales. Si en una versión futura se necesita soporte sobre contenido privado, deberá existir consentimiento, motivo, caducidad del acceso y registro de auditoría específico.
+
+## Rol RECRUITER propuesto, todavía no implementado
+
+Un reclutador cambia el alcance del producto: pasaría de seguimiento privado de candidaturas a publicar vacantes y recibir postulaciones. Antes de agregarlo a `roleSchema`, se necesitan organizaciones verificadas, pertenencia del reclutador a una organización, ofertas propias, consentimiento explícito del candidato para compartir CV y datos, y consultas que filtren por organización y vacante. Un reclutador no debe leer las postulaciones privadas del usuario ni obtener acceso por tener solo el rol. Registrar decisiones, accesos y cambios de estado con actor y fecha. Primero prototipar el flujo con usuarios; después diseñar migraciones y pruebas de aislamiento entre dos organizaciones.

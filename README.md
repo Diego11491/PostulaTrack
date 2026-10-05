@@ -59,6 +59,8 @@ PostulaTrack/
 
 Abre `database/001_schema.sql` en SSMS y ejecútalo con una cuenta que pueda crear bases de datos. El script crea `PostulaTrack`, los esquemas `sec`, `app` y `audit`, sus tablas, índices, catálogos y el procedimiento `app.ChangeApplicationStatus`. Ejecuta después `database/003_owner_integrity.sql` para impedir relaciones entre propietarios diferentes y `database/004_verify_traceability.sql` para comprobar las restricciones y el historial. Para una base existente, haz copia de seguridad y sigue las condiciones de la [migración](docs/14-MODELO-DE-DATOS-Y-AUDITORIA.md).
 
+Ejecuta también `database/005_profile_country.sql` **antes de arrancar esta versión de la API**; añade la columna opcional `Country` para el perfil. En bases ya existentes ejecuta solo esta migración aditiva (tras un backup), nunca vuelvas a crear las tablas con `001_schema.sql`. Comprueba que el `SELECT` final de la migración devuelve la columna.
+
 Al final del archivo hay un bloque comentado para crear el login de mínimo privilegio. Reemplaza `<GENERAR_CONTRASENA_SEGURA>`, descomenta el bloque y ejecútalo. No uses `sa` desde la aplicación.
 
 Ejecuta después `database/002_verify_installation.sql`. Debes ver los roles `USER` y `ADMIN`, nueve estados y las tablas creadas.

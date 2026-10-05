@@ -3,15 +3,11 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  Bell,
   BriefcaseBusiness,
-  ChevronDown,
-  CircleHelp,
   FileClock,
   LayoutDashboard,
   LogOut,
   Search,
-  Settings,
   ShieldCheck,
   Users,
   UserRound,
@@ -22,7 +18,6 @@ import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
   Sidebar,
   SidebarContent,
@@ -119,10 +114,12 @@ export function PostulaShell({ children }: { children: React.ReactNode }) {
         <SidebarFooter className="p-3">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton className="h-12 rounded-xl border border-white/8 bg-white/[0.035] text-slate-200 hover:bg-white/8 hover:text-white">
+              <SidebarMenuButton asChild className="h-12 rounded-xl border border-white/8 bg-white/[0.035] text-slate-200 hover:bg-white/8 hover:text-white">
+                <Link href="/perfil">
                 <Avatar className="size-7 rounded-lg"><AvatarFallback className="rounded-lg bg-cyan-400 font-bold text-slate-950">{initials}</AvatarFallback></Avatar>
                 <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{user.firstName} {user.lastName}</span><span className="block truncate text-xs text-slate-400">{isAdmin ? "Administrador" : "Usuario"}</span></span>
-                <ChevronDown className="size-3.5" />
+                <UserRound className="size-3.5" />
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -133,15 +130,9 @@ export function PostulaShell({ children }: { children: React.ReactNode }) {
       <SidebarInset className="min-w-0 bg-[#f4f7f9]">
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-xl md:px-7">
           <SidebarTrigger className="size-9 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100" />
-          <div className="relative hidden max-w-md flex-1 lg:block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <Input aria-label="Buscar postulaciones o empresas" placeholder="Buscar postulaciones, empresas o notas..." className="h-10 border-slate-200 bg-slate-50 pl-9 shadow-none placeholder:text-slate-400" />
-          </div>
+          <span className="hidden text-sm font-medium text-slate-500 sm:inline">Tu espacio de seguimiento</span>
           <div className="ml-auto flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="relative text-slate-600"><Bell /><span className="absolute right-2 top-2 size-2 rounded-full bg-amber-400 ring-2 ring-white" /><span className="sr-only">Notificaciones</span></Button>
-            <Button variant="ghost" size="icon" className="hidden text-slate-600 sm:inline-flex"><CircleHelp /><span className="sr-only">Ayuda</span></Button>
-            <div className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" />
-            <Button variant="ghost" size="sm" className="hidden text-slate-600 sm:inline-flex"><Settings />Ajustes</Button>
+            <Button variant="ghost" size="sm" asChild className="hidden text-slate-600 sm:inline-flex"><Link href="/seguridad"><ShieldCheck />Seguridad</Link></Button>
             <Button variant="ghost" size="icon-sm" className="text-slate-500" onClick={() => void logout()}><LogOut /><span className="sr-only">Cerrar sesión</span></Button>
           </div>
         </header>
