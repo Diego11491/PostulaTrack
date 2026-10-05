@@ -14,6 +14,7 @@ import { profileRouter } from "./modules/profile/profile.routes.js"
 import { jobsRouter } from "./modules/jobs/jobs.routes.js"
 import { errorHandler, notFound } from "./shared/http.js"
 import { getPool } from "./database/pool.js"
+import {jobOffersRouter} from "./modules/job-offers/job-offers.routes.js"
 
 export function createApp() {
   const app = express()
@@ -30,6 +31,7 @@ export function createApp() {
   app.use("/api/profile", profileRouter)
   app.use("/api/opportunities", opportunitiesRouter)
   app.use("/api/jobs", jobsRouter)
+  app.use("/api/job-offers", jobOffersRouter)
   app.use("/api/applications", applicationsRouter)
   app.use("/api/dashboard", dashboardRouter)
   app.use("/api/admin", adminRouter)

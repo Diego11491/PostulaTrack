@@ -6,8 +6,10 @@ import { authenticate, sessionCookie } from "../../middleware/security.js"
 import { AppError, asyncHandler } from "../../shared/http.js"
 import { revokeSession } from "./auth.repository.js"
 import { login, register } from "./auth.service.js"
+import { passwordRouter } from "./password.routes.js"
 
 export const authRouter = Router()
+authRouter.use(passwordRouter)
 const strictLimit = rateLimit({ windowMs: 15 * 60_000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false })
 
 authRouter.post("/register", strictLimit, asyncHandler(async (req, res) => {

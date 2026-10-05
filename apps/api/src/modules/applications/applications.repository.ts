@@ -32,11 +32,11 @@ export async function getApplication(userId: string, applicationId: number) {
     JOIN app.Companies c ON c.CompanyId=o.CompanyId AND c.OwnerUserId=@UserId
     WHERE a.ApplicationId=@ApplicationId AND a.OwnerUserId=@UserId AND a.IsDeleted=0;
 
-    SELECT h.HistoryId, prev.DisplayName AS PreviousStatus, current.DisplayName AS NewStatus,
+    SELECT h.HistoryId, prev.DisplayName AS PreviousStatus, nuevo.DisplayName AS NewStatus,
            h.Comment, h.ChangedAtUtc, p.FirstName, p.LastName
     FROM app.ApplicationStatusHistory h
     LEFT JOIN app.ApplicationStatuses prev ON prev.StatusId=h.PreviousStatusId
-    JOIN app.ApplicationStatuses current ON current.StatusId=h.NewStatusId
+    JOIN app.ApplicationStatuses nuevo ON nuevo.StatusId=h.NewStatusId
     JOIN app.Profiles p ON p.UserId=h.ChangedByUserId
     JOIN app.Applications a ON a.ApplicationId=h.ApplicationId AND a.OwnerUserId=@UserId
     WHERE h.ApplicationId=@ApplicationId
