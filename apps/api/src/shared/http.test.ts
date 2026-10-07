@@ -12,12 +12,12 @@ function responseStub() {
   return { response, result }
 }
 
-test("an unreachable SQL Server gives a safe, actionable 503", () => {
+test("an unreachable PostgreSQL gives a safe, actionable 503", () => {
   const { response, result } = responseStub()
   const previous = console.error
   console.error = () => undefined
   try {
-    errorHandler(Object.assign(new Error("host=127.0.0.1; password=never-return"), { code: "ESOCKET" }), {} as never, response, {} as never)
+    errorHandler(Object.assign(new Error("host=127.0.0.1; password=never-return"), { code: "ECONNREFUSED" }), {} as never, response, {} as never)
   } finally {
     console.error = previous
   }
@@ -25,7 +25,7 @@ test("an unreachable SQL Server gives a safe, actionable 503", () => {
   assert.deepEqual(result.body, {
     error: {
       code: "DATABASE_UNAVAILABLE",
-      message: "No se pudo acceder a la base de datos. Revisa el servicio SQL Server y la configuración local.",
+      message: "No se pudo acceder a la base de datos. Revisa la conexión PostgreSQL del servidor.",
     },
   })
 })

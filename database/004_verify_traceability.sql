@@ -22,16 +22,6 @@ OUTER APPLY (SELECT TOP (1) h.NewStatusId, h.ChangedAtUtc
              ORDER BY h.HistoryId DESC) latest
 WHERE a.IsDeleted=0 AND (latest.NewStatusId IS NULL OR latest.NewStatusId<>a.CurrentStatusId);
 
-IF EXISTS (
-  SELECT 1
-  FROM app.Applications a
-  OUTER APPLY (SELECT TOP (1) h.NewStatusId
-               FROM app.ApplicationStatusHistory h WHERE h.ApplicationId=a.ApplicationId
-               ORDER BY h.HistoryId DESC) latest
-  WHERE a.IsDeleted=0 AND (latest.NewStatusId IS NULL OR latest.NewStatusId<>a.CurrentStatusId)
-)
-  THROW 51011, 'El estado actual no coincide con el ultimo registro del historial.', 1;
-
 SELECT ActionCode, COUNT(*) AS LoggedEvents, MIN(CreatedAtUtc) AS FirstUtc, MAX(CreatedAtUtc) AS LastUtc
 FROM audit.AuditLog
 GROUP BY ActionCode

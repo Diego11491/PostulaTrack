@@ -2,7 +2,10 @@
   "name": "postulatrack",
   "version": "1.0.0",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:web": "npm run dev --workspace @postulatrack/web",
@@ -13,5 +16,7 @@
     "test": "npm run build --workspace @postulatrack/contracts && npm run test --workspace @postulatrack/api",
     "admin:create": "npm run admin:create --workspace @postulatrack/api --"
   },
-  "engines": { "node": ">=22.13.0" }
+  "engines": {
+    "node": ">=22.13.0"
+  }
 }

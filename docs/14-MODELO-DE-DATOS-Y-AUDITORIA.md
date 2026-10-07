@@ -1,3 +1,5 @@
+> **Nota de versión (2026-10-07):** este documento describe decisiones o evidencias de la etapa SQL Server. Para la arquitectura, instalación y estado vigentes usa `README.md`, `docs/01-arquitectura.md`, `docs/07-ESTADO-Y-EVIDENCIA.md` y `docs/16-PLAN-FUENTE-DE-VERDAD.md`. No ejecutes scripts SQL Server en PostgreSQL.
+
 # Modelo de datos y trazabilidad
 
 La complejidad responde a tres necesidades: aislar datos por usuario, conservar la evolución de cada postulación y poder explicar acciones sensibles con fecha UTC. SQL Server es la fuente de verdad; el navegador no guarda un historial paralelo. Los diagramas muestran tablas existentes en `001_schema.sql`; las nuevas claves compuestas se aplican con `003_owner_integrity.sql` después de verificar datos existentes.

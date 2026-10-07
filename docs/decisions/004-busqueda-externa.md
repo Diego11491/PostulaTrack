@@ -1,3 +1,5 @@
+> **Nota de versión (2026-10-07):** este documento describe decisiones o evidencias de la etapa SQL Server. Para la arquitectura, instalación y estado vigentes usa `README.md`, `docs/01-arquitectura.md`, `docs/07-ESTADO-Y-EVIDENCIA.md` y `docs/16-PLAN-FUENTE-DE-VERDAD.md`. No ejecutes scripts SQL Server en PostgreSQL.
+
 # ADR-004 · Ofertas externas con guardado explícito
 
 **Estado:** aceptada para integración inicial. **Fecha:** 2026-10-04.

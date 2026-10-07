@@ -1,34 +1,51 @@
-import sql from "mssql"
+import { Pool, type PoolClient } from "pg"
 import { env } from "../config/env.js"
 
-let pool: Promise<sql.ConnectionPool> | undefined
+// Una sola frontera de acceso a PostgreSQL; ni la web ni el navegador usan la credencial.
+const url = new URL(env.DATABASE_URL)
+const pool = new Pool({
+  host: url.hostname,
+  port: Number(url.port || 5432),
+  database: decodeURIComponent(url.pathname.slice(1)),
+  user: decodeURIComponent(url.username),
+  password: decodeURIComponent(url.password),
+  ssl: env.DATABASE_SSL ? { rejectUnauthorized: true } : false,
+  max: env.DATABASE_POOL_MAX,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 8_000,
+})
 
-export function getPool() {
-  if (!pool) {
-    pool = new sql.ConnectionPool({
-      server: env.SQLSERVER_HOST,
-      port: env.SQLSERVER_PORT,
-      database: env.SQLSERVER_DATABASE,
-      user: env.SQLSERVER_USER,
-      password: env.SQLSERVER_PASSWORD,
-      pool: { min: 0, max: 10, idleTimeoutMillis: 30000 },
-      options: {
-        encrypt: env.SQLSERVER_ENCRYPT,
-        trustServerCertificate: env.SQLSERVER_TRUST_CERTIFICATE,
-        enableArithAbort: true,
-      },
-    }).connect().catch(error => {
-      // Un primer intento fallido no debe dejar la API atada a una promesa rechazada.
-      pool = undefined
-      throw error
-    })
+// El contrato HTTP existente emplea PascalCase; PostgreSQL almacena identificadores en minúsculas.
+const apiFields = `UserId Email PasswordHash IsActive FailedLoginCount LockedUntilUtc FirstName LastName RoleName
+SessionId Phone Country City Headline ProfessionalSummary Institution Career GraduationYear UpdatedAtUtc
+CompanyId CompanyName OpportunityId JobTitle SourceName SourceUrl WorkMode Location PublishedOn
+ClosingOn Notes CreatedAtUtc ApplicationId AppliedOn NextAction NextActionAtUtc StatusCode StatusName
+SortOrder HistoryId PreviousStatus NewStatus Comment ChangedAtUtc Sector ActivityId Title ActivityType
+DueAtUtc CompletedAtUtc JobOfferId RequirementsSummary CreatedByUserId AuditId ActionCode EntityType
+EntityId ResultCode IpAddress Roles ActiveProcesses Interviews PendingActions AdvancedProcesses`.trim().split(/\s+/)
+const names = new Map(apiFields.map(name => [name.toLowerCase(), name]))
+export function toApiRow(row: Record<string, unknown>): Record<string, any> {
+  return Object.fromEntries(Object.entries(row).map(([key, value]) => [names.get(key.toLowerCase()) ?? key, value]))
+}
+export type DbClient = Pool | PoolClient
+export async function query(text: string, params: unknown[] = [], client: DbClient = pool) {
+  const result = await client.query(text, params)
+  return result.rows.map(toApiRow)
+}
+export async function transaction<T>(work: (client: PoolClient) => Promise<T>, isolation?: "SERIALIZABLE") {
+  const client = await pool.connect()
+  try {
+    await client.query("BEGIN")
+    if (isolation) await client.query(`SET TRANSACTION ISOLATION LEVEL ${isolation}`)
+    const result = await work(client)
+    await client.query("COMMIT")
+    return result
+  } catch (error) {
+    await client.query("ROLLBACK")
+    throw error
+  } finally {
+    client.release()
   }
-  return pool
 }
-
-export async function closePool() {
-  if (pool) (await pool).close()
-  pool = undefined
-}
-
-export { sql }
+export function getPool() { return pool }
+export async function closePool() { await pool.end() }

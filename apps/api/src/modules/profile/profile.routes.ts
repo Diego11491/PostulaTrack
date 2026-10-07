@@ -1,45 +1,23 @@
 import { profileSchema } from "@postulatrack/contracts"
 import { Router } from "express"
-import { getPool, sql } from "../../database/pool.js"
+import { query } from "../../database/pool.js"
 import { authenticate } from "../../middleware/security.js"
 import { AppError, asyncHandler } from "../../shared/http.js"
-
-export const profileRouter = Router()
+export const profileRouter=Router()
 profileRouter.use(authenticate)
-
-profileRouter.get("/", asyncHandler(async (req, res) => {
-  const pool = await getPool()
-  const result = await pool.request().input("UserId", sql.UniqueIdentifier, req.user!.userId).query(`
-    SELECT FirstName, LastName, Phone, Country, City, Headline, ProfessionalSummary,
-           Institution, Career, GraduationYear, UpdatedAtUtc
-    FROM app.Profiles WHERE UserId = @UserId;
-  `)
-  if (!result.recordset.length) throw new AppError(404, "PROFILE_NOT_FOUND", "No se encontró el perfil.")
-  res.json({ profile: result.recordset[0] })
+profileRouter.get("/",asyncHandler(async(req,res)=>{
+  const rows=await query(`SELECT firstname,lastname,phone,country,city,headline,professionalsummary,
+    institution,career,graduationyear,updatedatutc FROM app.profiles WHERE userid=$1`,[req.user!.userId])
+  if(!rows.length) throw new AppError(404,"PROFILE_NOT_FOUND","No se encontró el perfil.")
+  res.json({profile:rows[0]})
 }))
-
-profileRouter.put("/", asyncHandler(async (req, res) => {
-  const parsed = profileSchema.safeParse(req.body)
-  if (!parsed.success) throw new AppError(400, "VALIDATION_ERROR", "Revisa los datos del perfil.", parsed.error.flatten())
-  const data = parsed.data
-  const pool = await getPool()
-  await pool.request()
-    .input("UserId", sql.UniqueIdentifier, req.user!.userId)
-    .input("FirstName", sql.NVarChar(80), data.firstName)
-    .input("LastName", sql.NVarChar(120), data.lastName)
-    .input("Phone", sql.NVarChar(25), data.phone ?? null)
-    .input("Country", sql.NVarChar(100), data.country ?? null)
-    .input("City", sql.NVarChar(100), data.city ?? null)
-    .input("Headline", sql.NVarChar(180), data.headline ?? null)
-    .input("ProfessionalSummary", sql.NVarChar(1000), data.professionalSummary ?? null)
-    .input("Institution", sql.NVarChar(180), data.institution ?? null)
-    .input("Career", sql.NVarChar(160), data.career ?? null)
-    .input("GraduationYear", sql.SmallInt, data.graduationYear ?? null)
-    .query(`
-      UPDATE app.Profiles SET FirstName=@FirstName, LastName=@LastName, Phone=@Phone, Country=@Country, City=@City,
-        Headline=@Headline, ProfessionalSummary=@ProfessionalSummary, Institution=@Institution,
-        Career=@Career, GraduationYear=@GraduationYear, UpdatedAtUtc=SYSUTCDATETIME()
-      WHERE UserId=@UserId;
-    `)
-  res.json({ message: "Perfil actualizado." })
+profileRouter.put("/",asyncHandler(async(req,res)=>{
+  const parsed=profileSchema.safeParse(req.body)
+  if(!parsed.success) throw new AppError(400,"VALIDATION_ERROR","Revisa los datos del perfil.",parsed.error.flatten())
+  const p=parsed.data
+  await query(`UPDATE app.profiles SET firstname=$2,lastname=$3,phone=$4,country=$5,city=$6,
+    headline=$7,professionalsummary=$8,institution=$9,career=$10,graduationyear=$11,updatedatutc=now()
+    WHERE userid=$1`,[req.user!.userId,p.firstName,p.lastName,p.phone??null,p.country??null,p.city??null,
+      p.headline??null,p.professionalSummary??null,p.institution??null,p.career??null,p.graduationYear??null])
+  res.json({message:"Perfil actualizado."})
 }))

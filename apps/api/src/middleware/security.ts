@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto"
 import type { NextFunction, Request, Response } from "express"
 import { env, isProduction } from "../config/env.js"
-import { getPool, sql } from "../database/pool.js"
+import { query } from "../database/pool.js"
 import { AppError, asyncHandler } from "../shared/http.js"
 
 export const sessionCookie = {
@@ -23,20 +23,15 @@ export function enforceOrigin(req: Request, _res: Response, next: NextFunction) 
 export const authenticate = asyncHandler(async (req, _res, next) => {
   const token = req.cookies?.[env.SESSION_COOKIE_NAME]
   if (!token) throw new AppError(401, "UNAUTHENTICATED", "Debes iniciar sesión.")
-  const result = await (await getPool()).request().input("TokenHash", sql.VarBinary(32), tokenHash(token)).query(`
-    SELECT s.SessionId, u.UserId, u.Email, p.FirstName, p.LastName, r.Name AS RoleName
-    FROM sec.Sessions s
-    JOIN sec.Users u ON u.UserId=s.UserId
-    JOIN app.Profiles p ON p.UserId=u.UserId
-    JOIN sec.UserRoles ur ON ur.UserId=u.UserId
-    JOIN sec.Roles r ON r.RoleId=ur.RoleId
-    WHERE s.SessionTokenHash=@TokenHash AND s.RevokedAtUtc IS NULL
-      AND s.ExpiresAtUtc>SYSUTCDATETIME() AND u.IsActive=1;
-  `)
-  if (!result.recordset.length) throw new AppError(401, "INVALID_SESSION", "La sesión venció.")
-  const first = result.recordset[0]
+  const rows = await query(`SELECT s.sessionid, u.userid, u.email, p.firstname, p.lastname, r.name AS "RoleName"
+    FROM sec.sessions s JOIN sec.users u USING(userid) JOIN app.profiles p USING(userid)
+    JOIN sec.userroles ur USING(userid) JOIN sec.roles r USING(roleid)
+    WHERE s.sessiontokenhash=$1 AND s.revokedatutc IS NULL
+      AND s.expiresatutc>now() AND u.isactive=true`, [tokenHash(token)])
+  if (!rows.length) throw new AppError(401, "INVALID_SESSION", "La sesión venció.")
+  const first = rows[0]
   req.sessionId = first.SessionId
-  req.user = { userId: String(first.UserId), email: first.Email, firstName: first.FirstName, lastName: first.LastName, roles: result.recordset.map(row => row.RoleName) }
+  req.user = { userId: String(first.UserId), email: first.Email, firstName: first.FirstName, lastName: first.LastName, roles: rows.map(row => row.RoleName) }
   next()
 })
 
