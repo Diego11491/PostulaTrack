@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: postulatrack-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build --workspace @postulatrack/contracts && npm run build --workspace @postulatrack/api
+    startCommand: npm run start --workspace @postulatrack/api
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "true"
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DATABASE_POOL_MAX
+        value: "3"
+      - key: DATABASE_URL
+        sync: false
+      - key: WEB_ORIGIN
+        sync: false
