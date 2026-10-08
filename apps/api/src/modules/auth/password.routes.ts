@@ -3,167 +3,39 @@ import rateLimit from "express-rate-limit"
 import bcrypt from "bcryptjs"
 import { z } from "zod"
 import { registerSchema } from "@postulatrack/contracts"
-import { getPool, sql } from "../../database/pool.js"
+import { query, transaction } from "../../database/pool.js"
 import { authenticate } from "../../middleware/security.js"
 import { AppError, asyncHandler } from "../../shared/http.js"
 
 export const passwordRouter = Router()
-
-const passwordLimit = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
+const passwordLimit = rateLimit({ windowMs: 15*60_000, limit: 10 })
+const schema = z.object({
+  currentPassword:z.string().min(1).max(128),
+  newPassword:registerSchema.shape.password,
+  confirmation:z.string().min(1).max(128),
+}).superRefine((value, context) => {
+  if (value.newPassword !== value.confirmation) context.addIssue({ code:"custom",path:["confirmation"],message:"Las contraseñas nuevas no coinciden." })
+  if (value.currentPassword === value.newPassword) context.addIssue({ code:"custom",path:["newPassword"],message:"La contraseña nueva debe ser diferente." })
 })
-
-const passwordSchema = z
-  .object({
-    currentPassword: z.string().min(1).max(128),
-    newPassword: registerSchema.shape.password,
-    confirmation: z.string().min(1).max(128),
+passwordRouter.post("/change-password",authenticate,passwordLimit,asyncHandler(async(req,res) => {
+  const parsed = schema.safeParse(req.body)
+  if (!parsed.success) throw new AppError(400,"VALIDATION_ERROR","Revisa las contraseñas.",parsed.error.flatten())
+  if (!req.sessionId) throw new AppError(401,"UNAUTHORIZED","Debes iniciar sesión.")
+  const {currentPassword,newPassword} = parsed.data
+  const changed = await transaction(async client => {
+    const rows = await query(`SELECT passwordhash FROM sec.users WHERE userid=$1 AND isactive=true FOR UPDATE`,[req.user!.userId],client)
+    if (!rows.length) throw new AppError(401,"UNAUTHORIZED","Cuenta no disponible.")
+    const valid = await bcrypt.compare(currentPassword,rows[0].PasswordHash)
+    if (!valid) throw new AppError(400,"INVALID_CURRENT_PASSWORD","La contraseña actual es incorrecta.")
+    const session = await query(`SELECT sessionid FROM sec.sessions WHERE sessionid=$1 AND userid=$2
+      AND revokedatutc IS NULL AND expiresatutc>now()`,[req.sessionId,req.user!.userId],client)
+    if (!session.length) throw new AppError(409,"ACCOUNT_CHANGED","La sesión cambió. Inicia sesión nuevamente.")
+    const hash = await bcrypt.hash(newPassword,12)
+    await query(`UPDATE sec.users SET passwordhash=$1, failedlogincount=0,
+      lockeduntilutc=NULL,updatedatutc=now() WHERE userid=$2`,[hash,req.user!.userId],client)
+    await query(`UPDATE sec.sessions SET revokedatutc=now() WHERE userid=$1 AND sessionid<>$2
+      AND revokedatutc IS NULL`,[req.user!.userId,req.sessionId],client)
+    return true
   })
-  .superRefine((data, context) => {
-    if (data.newPassword !== data.confirmation) {
-      context.addIssue({
-        code: "custom",
-        path: ["confirmation"],
-        message: "Las contraseñas nuevas no coinciden.",
-      })
-    }
-
-    if (data.currentPassword === data.newPassword) {
-      context.addIssue({
-        code: "custom",
-        path: ["newPassword"],
-        message: "La contraseña nueva debe ser diferente de la actual.",
-      })
-    }
-  })
-
-passwordRouter.post(
-  "/change-password",
-  authenticate,
-  passwordLimit,
-  asyncHandler(async (req, res) => {
-    const parsed = passwordSchema.safeParse(req.body)
-
-    if (!parsed.success) {
-      throw new AppError(
-        400,
-        "VALIDATION_ERROR",
-        "Revisa los campos. La contraseña nueva debe tener entre 12 y 128 caracteres, una mayúscula, una minúscula y un número.",
-        parsed.error.flatten()
-      )
-    }
-
-    const userId = req.user!.userId
-    const sessionId = req.sessionId
-
-    if (!sessionId) {
-      throw new AppError(
-        401,
-        "UNAUTHORIZED",
-        "Debes iniciar sesión para cambiar tu contraseña."
-      )
-    }
-
-    const { currentPassword, newPassword } = parsed.data
-    const pool = await getPool()
-
-    const result = await pool
-      .request()
-      .input("UserId", sql.UniqueIdentifier, userId)
-      .query(`
-        SELECT PasswordHash
-        FROM sec.Users
-        WHERE UserId = @UserId
-          AND IsActive = 1;
-      `)
-
-    const account = result.recordset[0] as
-      | { PasswordHash: string }
-      | undefined
-
-    if (!account) {
-      throw new AppError(
-        401,
-        "UNAUTHORIZED",
-        "Tu cuenta no está disponible. Inicia sesión nuevamente."
-      )
-    }
-
-    const validPassword = await bcrypt.compare(
-      currentPassword,
-      account.PasswordHash
-    )
-
-    if (!validPassword) {
-      throw new AppError(
-        400,
-        "INVALID_CURRENT_PASSWORD",
-        "La contraseña actual es incorrecta."
-      )
-    }
-
-    const newHash = await bcrypt.hash(newPassword, 12)
-    const transaction = new sql.Transaction(pool)
-
-    await transaction.begin()
-
-    try {
-      const updated = await new sql.Request(transaction)
-        .input("UserId", sql.UniqueIdentifier, userId)
-        .input("SessionId", sql.BigInt, sessionId)
-        .input("OldHash", sql.NVarChar(255), account.PasswordHash)
-        .input("NewHash", sql.NVarChar(255), newHash)
-        .query(`
-          UPDATE sec.Users
-          SET PasswordHash = @NewHash,
-              FailedLoginCount = 0,
-              LockedUntilUtc = NULL,
-              UpdatedAtUtc = SYSUTCDATETIME()
-          OUTPUT inserted.UserId
-          WHERE UserId = @UserId
-            AND IsActive = 1
-            AND PasswordHash = @OldHash
-            AND EXISTS (
-              SELECT 1
-              FROM sec.Sessions
-              WHERE SessionId = @SessionId
-                AND UserId = @UserId
-                AND RevokedAtUtc IS NULL
-                AND ExpiresAtUtc > SYSUTCDATETIME()
-            );
-        `)
-
-      if (updated.recordset.length === 0) {
-        throw new AppError(
-          409,
-          "ACCOUNT_CHANGED",
-          "La cuenta o la sesión cambió. Inicia sesión nuevamente e inténtalo otra vez."
-        )
-      }
-
-      await new sql.Request(transaction)
-        .input("UserId", sql.UniqueIdentifier, userId)
-        .input("SessionId", sql.BigInt, sessionId)
-        .query(`
-          UPDATE sec.Sessions
-          SET RevokedAtUtc = SYSUTCDATETIME()
-          WHERE UserId = @UserId
-            AND SessionId <> @SessionId
-            AND RevokedAtUtc IS NULL;
-        `)
-
-      await transaction.commit()
-    } catch (error) {
-      await transaction.rollback()
-      throw error
-    }
-
-    res.json({
-      message:
-        "Contraseña actualizada correctamente. Se cerraron las otras sesiones de tu cuenta.",
-    })
-  })
-)
+  if (changed) res.json({message:"Contraseña actualizada correctamente. Se cerraron las otras sesiones de tu cuenta."})
+}))

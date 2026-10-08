@@ -1,99 +1,73 @@
 import type { ApplicationInput, StatusChangeInput } from "@postulatrack/contracts"
-import { getPool, sql } from "../../database/pool.js"
+import { query, transaction } from "../../database/pool.js"
 import { AppError } from "../../shared/http.js"
-
-export async function listApplications(userId: string) {
-  const pool = await getPool()
-  const result = await pool.request().input("UserId", sql.UniqueIdentifier, userId).query(`
-    SELECT a.ApplicationId, a.AppliedOn, a.NextAction, a.NextActionAtUtc, a.UpdatedAtUtc,
-           s.Code AS StatusCode, s.DisplayName AS StatusName, s.SortOrder,
-           o.OpportunityId, o.JobTitle, o.WorkMode, o.Location, c.Name AS CompanyName
-    FROM app.Applications a
-    JOIN app.ApplicationStatuses s ON s.StatusId=a.CurrentStatusId
-    JOIN app.Opportunities o ON o.OpportunityId=a.OpportunityId AND o.OwnerUserId=@UserId
-    JOIN app.Companies c ON c.CompanyId=o.CompanyId AND c.OwnerUserId=@UserId
-    WHERE a.OwnerUserId=@UserId AND a.IsDeleted=0
-    ORDER BY s.SortOrder, a.UpdatedAtUtc DESC;
-  `)
-  return result.recordset
+export async function listApplications(userId:string){
+  return query(`SELECT a.applicationid,a.appliedon,a.nextaction,a.nextactionatutc,a.updatedatutc,
+    s.code AS "StatusCode",s.displayname AS "StatusName",s.sortorder,
+    o.opportunityid,o.jobtitle,o.workmode,o.location,c.name AS "CompanyName"
+    FROM app.applications a JOIN app.applicationstatuses s ON s.statusid=a.currentstatusid
+    JOIN app.opportunities o ON o.opportunityid=a.opportunityid AND o.owneruserid=$1
+    JOIN app.companies c ON c.companyid=o.companyid AND c.owneruserid=$1
+    WHERE a.owneruserid=$1 AND NOT a.isdeleted ORDER BY s.sortorder,a.updatedatutc DESC`,[userId])
 }
-
-export async function getApplication(userId: string, applicationId: number) {
-  const pool = await getPool()
-  const request = pool.request().input("UserId", sql.UniqueIdentifier, userId).input("ApplicationId", sql.BigInt, applicationId)
-  const result = await request.query(`
-    SELECT a.ApplicationId, a.AppliedOn, a.NextAction, a.NextActionAtUtc, a.UpdatedAtUtc,
-           s.Code AS StatusCode, s.DisplayName AS StatusName,
-           o.OpportunityId, o.JobTitle, o.SourceName, o.SourceUrl, o.WorkMode, o.Location, o.Notes,
-           c.CompanyId, c.Name AS CompanyName, c.Sector
-    FROM app.Applications a
-    JOIN app.ApplicationStatuses s ON s.StatusId=a.CurrentStatusId
-    JOIN app.Opportunities o ON o.OpportunityId=a.OpportunityId AND o.OwnerUserId=@UserId
-    JOIN app.Companies c ON c.CompanyId=o.CompanyId AND c.OwnerUserId=@UserId
-    WHERE a.ApplicationId=@ApplicationId AND a.OwnerUserId=@UserId AND a.IsDeleted=0;
-
-    SELECT h.HistoryId, prev.DisplayName AS PreviousStatus, nuevo.DisplayName AS NewStatus,
-           h.Comment, h.ChangedAtUtc, p.FirstName, p.LastName
-    FROM app.ApplicationStatusHistory h
-    LEFT JOIN app.ApplicationStatuses prev ON prev.StatusId=h.PreviousStatusId
-    JOIN app.ApplicationStatuses nuevo ON nuevo.StatusId=h.NewStatusId
-    JOIN app.Profiles p ON p.UserId=h.ChangedByUserId
-    JOIN app.Applications a ON a.ApplicationId=h.ApplicationId AND a.OwnerUserId=@UserId
-    WHERE h.ApplicationId=@ApplicationId
-    ORDER BY h.ChangedAtUtc DESC;
-  `)
-  const sets = result.recordsets as unknown as Array<Array<Record<string, unknown>>>
-  if (!sets[0]?.length) return null
-  return { application: sets[0][0], history: sets[1] ?? [] }
+export async function getApplication(userId:string,applicationId:number){
+  const rows=await query(`SELECT a.applicationid,a.appliedon,a.nextaction,a.nextactionatutc,a.updatedatutc,
+    s.code AS "StatusCode",s.displayname AS "StatusName",o.opportunityid,o.jobtitle,o.sourcename,
+    o.sourceurl,o.workmode,o.location,o.notes,c.companyid,c.name AS "CompanyName",c.sector
+    FROM app.applications a JOIN app.applicationstatuses s ON s.statusid=a.currentstatusid
+    JOIN app.opportunities o ON o.opportunityid=a.opportunityid AND o.owneruserid=$1
+    JOIN app.companies c ON c.companyid=o.companyid AND c.owneruserid=$1
+    WHERE a.applicationid=$2 AND a.owneruserid=$1 AND NOT a.isdeleted`,[userId,applicationId])
+  if(!rows.length) return null
+  const history=await query(`SELECT h.historyid,prev.displayname AS "PreviousStatus",
+    next.displayname AS "NewStatus",h.comment,h.changedatutc,p.firstname,p.lastname
+    FROM app.applicationstatushistory h
+    LEFT JOIN app.applicationstatuses prev ON prev.statusid=h.previousstatusid
+    JOIN app.applicationstatuses next ON next.statusid=h.newstatusid
+    JOIN app.profiles p ON p.userid=h.changedbyuserid
+    JOIN app.applications a ON a.applicationid=h.applicationid AND a.owneruserid=$1
+    WHERE h.applicationid=$2 ORDER BY h.historyid DESC`,[userId,applicationId])
+  return {application:rows[0],history}
 }
-
-export async function createApplication(userId: string, input: ApplicationInput) {
-  const pool = await getPool()
-  const transaction = new sql.Transaction(pool)
-  await transaction.begin()
-  try {
-    const owner = await new sql.Request(transaction)
-      .input("UserId", sql.UniqueIdentifier, userId)
-      .input("OpportunityId", sql.BigInt, input.opportunityId)
-      .query("SELECT 1 AS Owned FROM app.Opportunities WHERE OpportunityId=@OpportunityId AND OwnerUserId=@UserId AND IsDeleted=0;")
-    if (!owner.recordset.length) throw new AppError(404, "OPPORTUNITY_NOT_FOUND", "No se encontró la oportunidad.")
-    const inserted = await new sql.Request(transaction)
-      .input("UserId", sql.UniqueIdentifier, userId)
-      .input("OpportunityId", sql.BigInt, input.opportunityId)
-      .input("AppliedOn", sql.Date, input.appliedOn ?? null)
-      .input("NextAction", sql.NVarChar(250), input.nextAction ?? null)
-      .input("NextActionAtUtc", sql.DateTime2(0), input.nextActionAtUtc ? new Date(input.nextActionAtUtc) : null)
-      .query(`
-        DECLARE @StatusId SMALLINT=(SELECT StatusId FROM app.ApplicationStatuses WHERE Code='REGISTERED');
-        INSERT INTO app.Applications(OwnerUserId, OpportunityId, CurrentStatusId, AppliedOn, NextAction, NextActionAtUtc)
-        OUTPUT inserted.ApplicationId
-        VALUES(@UserId, @OpportunityId, @StatusId, @AppliedOn, @NextAction, @NextActionAtUtc);
-      `)
-    const applicationId = inserted.recordset[0].ApplicationId
-    await new sql.Request(transaction).input("UserId", sql.UniqueIdentifier, userId).input("ApplicationId", sql.BigInt, applicationId).query(`
-      INSERT INTO app.ApplicationStatusHistory(ApplicationId, PreviousStatusId, NewStatusId, ChangedByUserId, Comment)
-      SELECT @ApplicationId, NULL, StatusId, @UserId, N'Proceso creado.' FROM app.ApplicationStatuses WHERE Code='REGISTERED';
-    `)
-    await new sql.Request(transaction)
-      .input("UserId", sql.UniqueIdentifier, userId)
-      .input("ApplicationId", sql.NVarChar(80), String(applicationId))
-      .query(`INSERT INTO audit.AuditLog(UserId, ActionCode, EntityType, EntityId, ResultCode)
-              VALUES(@UserId, 'APPLICATION_CREATED', 'Application', @ApplicationId, 'SUCCESS');`)
-    await transaction.commit()
-    return Number(applicationId)
-  } catch (error) {
-    await transaction.rollback()
-    throw error
-  }
+export async function createApplication(userId:string,input:ApplicationInput){
+  return transaction(async client=>{
+    const owned=await query(`SELECT 1 FROM app.opportunities WHERE opportunityid=$1 AND owneruserid=$2
+      AND NOT isdeleted FOR UPDATE`,[input.opportunityId,userId],client)
+    if(!owned.length) throw new AppError(404,"OPPORTUNITY_NOT_FOUND","No se encontró la oportunidad.")
+    const existing=await query(`SELECT applicationid FROM app.applications
+      WHERE opportunityid=$1 AND owneruserid=$2 AND NOT isdeleted`,[input.opportunityId,userId],client)
+    if(existing.length) throw new AppError(409,"APPLICATION_EXISTS","Esta oportunidad ya tiene un proceso de seguimiento.")
+    const rows=await query(`INSERT INTO app.applications
+      (owneruserid,opportunityid,currentstatusid,appliedon,nextaction,nextactionatutc)
+      SELECT $1,$2,statusid,$3,$4,$5 FROM app.applicationstatuses WHERE code='REGISTERED'
+      RETURNING applicationid`,[userId,input.opportunityId,input.appliedOn??null,
+        input.nextAction??null,input.nextActionAtUtc??null],client)
+    const applicationId=rows[0].ApplicationId
+    await query(`INSERT INTO app.applicationstatushistory(applicationid,previousstatusid,newstatusid,changedbyuserid,comment)
+      SELECT $1,NULL,statusid,$2,'Proceso creado.' FROM app.applicationstatuses WHERE code='REGISTERED'`,
+      [applicationId,userId],client)
+    await query(`INSERT INTO audit.auditlog(userid,actioncode,entitytype,entityid,resultcode)
+      VALUES($1,'APPLICATION_CREATED','Application',$2,'SUCCESS')`,[userId,String(applicationId)],client)
+    return applicationId as number
+  })
 }
-
-export async function changeStatus(userId: string, applicationId: number, input: StatusChangeInput, ip: string | null) {
-  const pool = await getPool()
-  await pool.request()
-    .input("ApplicationId", sql.BigInt, applicationId)
-    .input("OwnerUserId", sql.UniqueIdentifier, userId)
-    .input("NewStatusCode", sql.VarChar(30), input.newStatusCode)
-    .input("Comment", sql.NVarChar(1000), input.comment ?? null)
-    .input("IpAddress", sql.VarChar(45), ip)
-    .execute("app.ChangeApplicationStatus")
+export async function changeStatus(userId:string,applicationId:number,input:StatusChangeInput,ip:string|null){
+  return transaction(async client=>{
+    const status=await query(`SELECT statusid FROM app.applicationstatuses WHERE code=$1 AND isactive=true`,
+      [input.newStatusCode],client)
+    if(!status.length) throw new AppError(400,"INVALID_STATUS","Estado no válido.")
+    const current=await query(`SELECT currentstatusid FROM app.applications WHERE applicationid=$1
+      AND owneruserid=$2 AND NOT isdeleted FOR UPDATE`,[applicationId,userId],client)
+    if(!current.length) throw new AppError(404,"NOT_FOUND","Postulación no encontrada o acceso denegado.")
+    const oldId=current[0].currentstatusid as number
+    const newId=status[0].statusid as number
+    if(oldId===newId) throw new AppError(409,"SAME_STATUS","El nuevo estado debe ser diferente del actual.")
+    await query(`UPDATE app.applications SET currentstatusid=$1,updatedatutc=now()
+      WHERE applicationid=$2 AND owneruserid=$3`,[newId,applicationId,userId],client)
+    await query(`INSERT INTO app.applicationstatushistory(applicationid,previousstatusid,newstatusid,changedbyuserid,comment)
+      VALUES($1,$2,$3,$4,$5)`,[applicationId,oldId,newId,userId,input.comment??null],client)
+    await query(`INSERT INTO audit.auditlog(userid,actioncode,entitytype,entityid,resultcode,ipaddress,detailsjson)
+      VALUES($1,'APPLICATION_STATUS_CHANGED','Application',$2,'SUCCESS',$3,$4::jsonb)`,
+      [userId,String(applicationId),ip,JSON.stringify({previousStatusId:oldId,newStatusId:newId})],client)
+  })
 }

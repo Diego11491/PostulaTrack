@@ -1,37 +1,9 @@
-# Seguridad
+# Seguridad de PostulaTrack
 
-## Controles implementados
+La aplicación conserva sesiones en `sec.sessions` dentro de PostgreSQL y utiliza cookies `HttpOnly`, `SameSite=Lax` y `Secure` en producción. El backend controla `WEB_ORIGIN`, valida entradas con Zod, verifica rol y propietario, y ejecuta consultas parametrizadas. El hash bcrypt protege la contraseña almacenada; no se cifra reversiblemente. La URL de la base y la clave Jooble nunca deben exponerse en Next.js como `NEXT_PUBLIC_`.
 
-- Contraseñas derivadas con bcrypt y costo 12; nunca se almacenan en texto claro.
-- Contraseña mínima de 12 caracteres con mayúscula, minúscula y número.
-- Cookie de sesión opaca, `HttpOnly`, `SameSite=Lax` y `Secure` en producción.
-- Solo el SHA-256 del token de sesión se almacena en SQL Server.
-- Bloqueo de 15 minutos después de cinco credenciales incorrectas.
-- Límite de solicitudes global y más estricto en registro/login.
-- Helmet para cabeceras defensivas y CORS limitado al origen configurado.
-- Comprobación de `Origin` en operaciones que modifican datos.
-- Validación Zod y tamaño máximo de cuerpo de 256 KB.
-- Consultas SQL parametrizadas.
-- Autorización por rol y por propietario.
-- Auditoría de cambios de estado y acciones administrativas.
-- Integración Jooble con host fijo, clave solo en servidor, búsqueda limitada por tasa y caché de diez minutos; fallos externos no exponen la clave.
-- Confianza en cabeceras de proxy desactivada por defecto (`TRUST_PROXY=false`); habilitarla solo detrás de proxy propio.
-- La cuenta SQL de aplicación no recibe `DELETE` ni permisos de definición de esquema.
+Para operaciones que modifican datos, el navegador envía `X-CSRF-Token` y la cookie legible `pt_csrf`. El servidor verifica ambos contra un HMAC ligado al token de sesión HttpOnly, además de comprobar `Origin`. Login y registro no requieren sesión previa y mantienen la comprobación de origen. `GET /api/auth/csrf` renueva la cookie para sesiones anteriores al cambio; al cerrar sesión se elimina. `/ready` tiene un límite propio de 30 solicitudes por minuto por IP; `/api` conserva su límite global. En despliegues con varias réplicas, utilizar un almacén compartido de límites.
 
-## Responsabilidad por capas
+La conexión de producción a PostgreSQL debe usar TLS con certificado válido (`DATABASE_SSL=true`). En Supabase, los esquemas `sec`, `app` y `audit` son para acceso del backend; no conceder acceso directo al navegador. Crear un rol SQL de mínimo privilegio después de verificar las necesidades de lectura/escritura y separar la cuenta que instala migraciones de la cuenta de la API.
 
-| Riesgo | Control principal |
-|---|---|
-| Robo de contraseña | bcrypt y bloqueo temporal |
-| Robo de sesión desde JavaScript | cookie `HttpOnly` |
-| CSRF | `SameSite` y validación de origen |
-| Inyección SQL | parámetros y validación |
-| Acceso a datos de otro usuario | filtro por `OwnerUserId` |
-| Abuso administrativo | rol `ADMIN` y auditoría |
-| Borrado accidental | baja lógica y permiso `DELETE` denegado |
-
-## Antes de producción
-
-Habilitar HTTPS obligatorio, secretos en Azure Key Vault, rotación de credenciales, MFA para administradores, recuperación de contraseña verificada, análisis de dependencias, pruebas OWASP y alertas de Application Insights. La pantalla de seguridad muestra algunas capacidades futuras, pero MFA no forma parte del incremento actual.
-
-Ver [seguridad y estrategia de pruebas](13-SEGURIDAD-Y-PRUEBAS.md). SAST, SCA y pruebas de autorización cumplen propósitos distintos y no deben declararse como ejecutados sin sus resultados.
+Quedan por probar formalmente: cookies en hosting HTTPS, acceso cruzado A/B, sesiones revocadas, limitación de intentos entre varias instancias, secretos, respaldo/restauración y enlaces externos. La prueba HTTP embebida ya cubre rechazo de token CSRF ausente o incorrecto; repetir el flujo en hosting HTTPS. Ver `docs/13-SEGURIDAD-Y-PRUEBAS.md`.

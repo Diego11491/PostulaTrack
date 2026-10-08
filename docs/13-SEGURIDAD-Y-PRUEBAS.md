@@ -1,26 +1,21 @@
-# Seguridad y pruebas de PostulaTrack
+# Seguridad y pruebas · PostgreSQL
 
-La imagen de clase representa el **Modelo V**: cada nivel de especificación tiene pruebas correspondientes. En seguridad probablemente la palabra buscada fue **SAST** (análisis estático de seguridad), no SAP (sistema empresarial). Confirmarlo con la profesora si mencionó una herramienta concreta.
+## Controles del código
 
-| Lado de diseño | Evidencia de prueba | Estado actual |
+- Contraseñas: hash bcrypt; no se recupera texto original. Las credenciales de PostgreSQL y Jooble solo pertenecen a la API.
+- Sesión: token aleatorio en cookie HttpOnly; su SHA-256 y caducidad se guardan en `sec.sessions`. La API vuelve a consultar rol y cuenta activa.
+- Autorización: ADMIN administra cuentas y ofertas publicadas; no obtiene permiso automático sobre las postulaciones privadas. Las consultas filtran por dueño y las claves compuestas impiden vínculos entre dueños.
+- SQL: `pg` recibe texto fijo y parámetros `$1...$n`; no se forma SQL concatenando datos del usuario. Los enlaces externos se limitan a HTTP(S).
+- Transporte: TLS de PostgreSQL debe estar activado para hosting y el certificado validado. `DATABASE_URL` permanece fuera de Git y fuera de variables `NEXT_PUBLIC_`.
+
+## Evidencia por tipo
+
+| Tipo | Escenarios mínimos | Registro |
 |---|---|---|
-| Problema e historias + criterios | Pruebas de aceptación con usuarios y SQL Server | Pendiente. |
-| Arquitectura y límites web/API/SQL | Prueba del recorrido completo y usuario A/B | Pendiente. |
-| Diseño de módulos y contratos | Integración de API y base | Pendiente. |
-| Funciones puras y adaptador Jooble | `npm test` con respuestas simuladas, errores, caché y validación | Código de prueba añadido; verificar ejecución. |
+| Unitarias | Validación de perfil, búsquedas y errores | Salida de `npm test`. |
+| Integración | Esquema PostgreSQL, historial atómico, dueño A/B, rutas HTTP y rol ADMIN | Pruebas embebidas + repetición en Supabase. |
+| Caja negra | Registro, login, oportunidad, postulación, cambio, historial, logout, cuenta ajena | Pasos/capturas con fecha, commit y entorno. |
+| Caja blanca | Ramas de sesión, autorización, validación, duplicado y rollback | Código señalado y casos que cubren cada rama. |
+| Rendimiento | Listas, búsqueda, cambio de estado y web móvil | Línea base, carga definida, p95/error, planes SQL y métricas de navegador. |
 
-## Controles complementarios
-
-- **SAST** revisa patrones de seguridad en el código. `.github/workflows/codeql.yml` analiza JavaScript/TypeScript **solo si el repo es público**; en privado el job queda omitido para no romper CI sin licencia. Un repositorio privado con GitHub Code Security habilitado puede adaptar esa condición. Verificar una ejecución verde y triage de resultados antes de afirmar cobertura. [Condiciones de CodeQL](https://docs.github.com/en/code-security/how-tos/find-and-fix-code-vulnerabilities/configure-code-scanning/configure-code-scanning).
-- **SCA** analiza dependencias: el CI existente ejecuta `npm audit --omit=dev`; este comando no analiza toda la lógica del código y no equivale a SAST.
-- La auditoría del ZIP original detectó una alerta crítica en `next` 16.3.5 (`GHSA-vcvr-r3jv-pc5j`). Este patch actualiza `next` y el lockfile a versión corregida; validar `npm audit --omit=dev` después de aplicar. [Aviso de GitHub](https://github.com/advisories/GHSA-vcvr-r3jv-pc5j).
-- **Pruebas de seguridad funcional:** sesión vencida, IDs ajenos, rol ADMIN, CSRF/Origin, rate limit, cabeceras, enlace de oferta malicioso, proveedor caído y clave ausente.
-- **Revisión manual** de manejo de PII, logs y despliegue HTTPS con el estándar OWASP ASVS como guía, sin afirmar certificación. [ASVS](https://owasp.org/projects/asvs).
-
-## Puertas antes de publicación
-
-1. Ejecutar pruebas aisladas, typecheck y build; registrar fecha y salida.
-2. Ejecutar pruebas de integración con SQL Server real en CI o ambiente de prueba controlado. El test del adaptador no valida SQL Server.
-3. En dos cuentas, probar que ningún endpoint devuelve oportunidades, acciones o postulaciones de la otra cuenta. ADMIN no debe tener acceso al contenido laboral privado.
-4. Activar SAST según elegibilidad del repositorio y triage de alertas. Confirmar que secretos no entran en Git, logs, error HTTP o variables públicas del frontend.
-5. Revisar backups y restauración si se desplegará fuera del equipo local.
+Las pruebas embebidas no prueban red, TLS, cuota ni respaldo de Supabase. Faltan prueba de carga, paginación completa, política de secretos y restauración. No llamar «certificado» a un flujo sin resultado observado y firmado por el equipo.

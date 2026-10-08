@@ -1,11 +1,11 @@
 import { applicationSchema, statusChangeSchema } from "@postulatrack/contracts"
 import { Router } from "express"
-import { authenticate } from "../../middleware/security.js"
+import { authenticate, requireCandidate } from "../../middleware/security.js"
 import { AppError, asyncHandler } from "../../shared/http.js"
 import { changeStatus, createApplication, getApplication, listApplications } from "./applications.repository.js"
 
 export const applicationsRouter = Router()
-applicationsRouter.use(authenticate)
+applicationsRouter.use(authenticate,requireCandidate)
 
 applicationsRouter.get("/", asyncHandler(async (req, res) => {
   res.json({ applications: await listApplications(req.user!.userId) })

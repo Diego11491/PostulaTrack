@@ -4,6 +4,7 @@ import type { AuthUser, LoginInput, RegisterInput } from "@postulatrack/contract
 import { useRouter } from "next/navigation"
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { apiRequest } from "@/lib/api-client"
+import { workspaceHome } from "@/lib/workspace-role"
 
 type AuthContextValue = {
   user: AuthUser | null
@@ -37,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (input: LoginInput) => {
     const result = await apiRequest<{ user: AuthUser }>("/auth/login", { method: "POST", body: JSON.stringify(input) })
     setUser(result.user)
-    router.push("/")
+    router.push(workspaceHome(result.user.roles))
   }, [router])
 
   const register = useCallback(async (input: RegisterInput) => {

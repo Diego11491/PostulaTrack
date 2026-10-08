@@ -33,6 +33,9 @@ type Offer = {
   SourceUrl: string
   PublishedOn: string | null
   ClosingOn: string | null
+  OrganizationId: number | null
+  HasApplied: boolean
+  HasWithdrawn: boolean
 }
 
 function dateInput(value: string | null) {
@@ -50,6 +53,7 @@ export default function OportunidadesPage() {
   const router = useRouter()
   const { user } = useAuth()
   const isAdmin = user?.roles.includes("ADMIN") ?? false
+  const isRecruiter = user?.roles.includes("RECRUITER") ?? false
 
   const [items, setItems] = useState<OpportunityRow[]>([])
   const [offers, setOffers] = useState<Offer[]>([])
@@ -65,6 +69,8 @@ export default function OportunidadesPage() {
   const [registering, setRegistering] = useState<number | null>(
     null
   )
+  const [startingId, setStartingId] = useState<number | null>(null)
+  const [sendingId, setSendingId] = useState<number | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -181,6 +187,45 @@ export default function OportunidadesPage() {
     }
   }
 
+  async function startTracking(item: OpportunityRow) {
+    if (startingId !== null || item.ApplicationId) return
+    setStartingId(item.OpportunityId)
+    setActionError("")
+    try {
+      const result = await apiRequest<{ applicationId: number }>("/applications", {
+        method: "POST",
+        body: JSON.stringify({ opportunityId: item.OpportunityId }),
+      })
+      router.push(`/postulaciones/${result.applicationId}`)
+    } catch (cause) {
+      setActionError(cause instanceof ApiClientError ? cause.message : "No se pudo iniciar el seguimiento.")
+      setStartingId(null)
+    }
+  }
+
+  async function sendCandidacy(offer: Offer) {
+    if (sendingId !== null) return
+    if (!window.confirm(`Enviar candidatura a ${offer.CompanyName} para «${offer.JobTitle}»?\n\nCompartirás tu nombre y correo de cuenta con el equipo de RR. HH. de esa empresa. Tu historial privado no se comparte.`)) return
+    setSendingId(offer.JobOfferId)
+    setActionError("")
+    try {
+      await apiRequest(`/job-offers/${offer.JobOfferId}/apply`, { method:"POST", body:JSON.stringify({consent:true}) })
+      setOffers(current => current.map(item => item.JobOfferId === offer.JobOfferId ? {...item,HasApplied:true} : item))
+    } catch(cause) {
+      setActionError(cause instanceof ApiClientError ? cause.message : "No se pudo enviar la candidatura.")
+    } finally { setSendingId(null) }
+  }
+  async function withdrawCandidacy(offer: Offer) {
+    if (sendingId !== null || !window.confirm("¿Retirar esta candidatura? La empresa dejará de verla en su bandeja.")) return
+    setSendingId(offer.JobOfferId)
+    setActionError("")
+    try {
+      await apiRequest(`/job-offers/${offer.JobOfferId}/application`, {method:"DELETE"})
+      setOffers(current => current.map(item => item.JobOfferId === offer.JobOfferId ? {...item,HasApplied:false,HasWithdrawn:true} : item))
+    } catch(cause) { setActionError(cause instanceof ApiClientError ? cause.message : "No se pudo retirar la candidatura.") }
+    finally { setSendingId(null) }
+  }
+
   return (
     <PostulaShell>
       <div className="mx-auto w-full max-w-[1500px] px-4 py-6 md:px-7 md:py-8">
@@ -201,7 +246,7 @@ export default function OportunidadesPage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {isAdmin && (
+            {(isAdmin || isRecruiter) && (
               <Button asChild variant="outline">
                 <Link href="/oportunidades/publicar">
                   Gestionar ofertas
@@ -350,6 +395,8 @@ export default function OportunidadesPage() {
                             ? "Registrando…"
                             : "Registrar mi postulación"}
                         </Button>
+                        {offer.OrganizationId && !isRecruiter && !isAdmin && <Button type="button" variant="outline" disabled={sendingId !== null || offer.HasApplied || offer.HasWithdrawn} onClick={() => void sendCandidacy(offer)}>{offer.HasApplied ? "Candidatura enviada" : offer.HasWithdrawn ? "Candidatura retirada" : sendingId === offer.JobOfferId ? "Enviando…" : "Enviar a la empresa"}</Button>}
+                        {offer.OrganizationId && offer.HasApplied && <Button type="button" variant="ghost" disabled={sendingId !== null} onClick={() => void withdrawCandidacy(offer)}>Retirar candidatura</Button>}
                       </div>
                     </CardContent>
                   </Card>
@@ -397,18 +444,27 @@ export default function OportunidadesPage() {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-3">
                         <Badge variant="outline">
                           {item.ApplicationStatus || "Guardada"}
                         </Badge>
 
-                        {item.ApplicationId && (
+                        {item.ApplicationId ? (
                           <Button asChild variant="outline">
                             <Link
                               href={`/postulaciones/${item.ApplicationId}`}
                             >
                               Ver seguimiento
                             </Link>
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            disabled={startingId !== null}
+                            onClick={() => void startTracking(item)}
+                            className="bg-slate-950 text-white"
+                          >
+                            {startingId === item.OpportunityId ? "Iniciando…" : "Iniciar seguimiento"}
                           </Button>
                         )}
                       </div>

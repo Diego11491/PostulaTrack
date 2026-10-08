@@ -1,124 +1,51 @@
 import type { OpportunityInput } from "@postulatrack/contracts"
-import { getPool, sql } from "../../database/pool.js"
+import { query, transaction } from "../../database/pool.js"
 
-export async function listOpportunities(userId: string) {
-  const pool = await getPool()
-  const result = await pool.request().input("UserId", sql.UniqueIdentifier, userId).query(`
-    SELECT o.OpportunityId, o.JobTitle, o.SourceName, o.SourceUrl, o.WorkMode, o.Location,
-           o.PublishedOn, o.ClosingOn, o.Notes, o.CreatedAtUtc, c.CompanyId, c.Name AS CompanyName,
-           a.ApplicationId, s.Code AS ApplicationStatusCode, s.DisplayName AS ApplicationStatus
-    FROM app.Opportunities o
-    JOIN app.Companies c ON c.CompanyId = o.CompanyId AND c.OwnerUserId = @UserId
-    LEFT JOIN app.Applications a ON a.OpportunityId = o.OpportunityId AND a.OwnerUserId = @UserId AND a.IsDeleted = 0
-    LEFT JOIN app.ApplicationStatuses s ON s.StatusId = a.CurrentStatusId
-    WHERE o.OwnerUserId = @UserId AND o.IsDeleted = 0
-    ORDER BY o.CreatedAtUtc DESC;
-  `)
-  return result.recordset
+export async function listOpportunities(userId:string){
+  return query(`SELECT o.opportunityid,o.jobtitle,o.sourcename,o.sourceurl,o.workmode,o.location,
+    o.publishedon,o.closingon,o.notes,o.createdatutc,c.companyid,c.name AS "CompanyName",
+    a.applicationid,s.code AS "ApplicationStatusCode",s.displayname AS "ApplicationStatus"
+    FROM app.opportunities o JOIN app.companies c ON c.companyid=o.companyid AND c.owneruserid=$1
+    LEFT JOIN app.applications a ON a.opportunityid=o.opportunityid AND a.owneruserid=$1 AND NOT a.isdeleted
+    LEFT JOIN app.applicationstatuses s ON s.statusid=a.currentstatusid
+    WHERE o.owneruserid=$1 AND NOT o.isdeleted ORDER BY o.createdatutc DESC`,[userId])
 }
-
-export async function createOpportunity(userId: string, input: OpportunityInput) {
-  const pool = await getPool()
-  const transaction = new sql.Transaction(pool)
-  await transaction.begin()
-  try {
-    const companyResult = await new sql.Request(transaction)
-      .input("UserId", sql.UniqueIdentifier, userId)
-      .input("Name", sql.NVarChar(180), input.companyName)
-      .input("Sector", sql.NVarChar(120), input.sector ?? null)
-      .query(`
-        DECLARE @CompanyId BIGINT = (SELECT CompanyId FROM app.Companies WITH (UPDLOCK, HOLDLOCK)
-          WHERE OwnerUserId=@UserId AND Name=@Name AND IsDeleted=0);
-        IF @CompanyId IS NULL
-        BEGIN
-          INSERT INTO app.Companies(OwnerUserId, Name, Sector) VALUES(@UserId, @Name, @Sector);
-          SET @CompanyId = SCOPE_IDENTITY();
-        END
-        SELECT @CompanyId AS CompanyId;
-      `)
-    const companyId = companyResult.recordset[0].CompanyId
-
-    const opportunityResult = await new sql.Request(transaction)
-      .input("UserId", sql.UniqueIdentifier, userId)
-      .input("CompanyId", sql.BigInt, companyId)
-      .input("JobTitle", sql.NVarChar(180), input.jobTitle)
-      .input("SourceName", sql.NVarChar(100), input.sourceName ?? null)
-      .input("SourceUrl", sql.NVarChar(1000), input.sourceUrl || null)
-      .input("WorkMode", sql.VarChar(20), input.workMode ?? null)
-      .input("Location", sql.NVarChar(180), input.location ?? null)
-      .input("PublishedOn", sql.Date, input.publishedOn ?? null)
-      .input("ClosingOn", sql.Date, input.closingOn ?? null)
-      .input("Notes", sql.NVarChar(2000), input.notes ?? null)
-      .query(`
-        INSERT INTO app.Opportunities(OwnerUserId, CompanyId, JobTitle, SourceName, SourceUrl, WorkMode, Location, PublishedOn, ClosingOn, Notes)
-        OUTPUT inserted.OpportunityId
-        VALUES(@UserId, @CompanyId, @JobTitle, @SourceName, @SourceUrl, @WorkMode, @Location, @PublishedOn, @ClosingOn, @Notes);
-      `)
-    const opportunityId = opportunityResult.recordset[0].OpportunityId
-    let applicationId: number | null = null
-
-    if (input.createApplication) {
-      const application = await new sql.Request(transaction)
-        .input("UserId", sql.UniqueIdentifier, userId)
-        .input("OpportunityId", sql.BigInt, opportunityId)
-        .query(`
-          DECLARE @StatusId SMALLINT = (SELECT StatusId FROM app.ApplicationStatuses WHERE Code='REGISTERED');
-          INSERT INTO app.Applications(OwnerUserId, OpportunityId, CurrentStatusId)
-          OUTPUT inserted.ApplicationId
-          VALUES(@UserId, @OpportunityId, @StatusId);
-        `)
-      applicationId = application.recordset[0].ApplicationId
-      await new sql.Request(transaction)
-        .input("UserId", sql.UniqueIdentifier, userId)
-        .input("ApplicationId", sql.BigInt, applicationId)
-        .query(`
-          INSERT INTO app.ApplicationStatusHistory(ApplicationId, PreviousStatusId, NewStatusId, ChangedByUserId, Comment)
-          SELECT @ApplicationId, NULL, StatusId, @UserId, N'Proceso creado desde una oportunidad.'
-          FROM app.ApplicationStatuses WHERE Code='REGISTERED';
-        `)
+export async function createOpportunity(userId:string,input:OpportunityInput){
+  return transaction(async client=>{
+    // ON CONFLICT usa el índice único filtrado; dos solicitudes paralelas no duplican la empresa.
+    const companies=await query(`INSERT INTO app.companies(owneruserid,name,sector) VALUES($1,$2,$3)
+      ON CONFLICT (owneruserid,name) WHERE NOT isdeleted DO UPDATE SET name=EXCLUDED.name
+      RETURNING companyid`,[userId,input.companyName,input.sector??null],client)
+    const companyId=companies[0].CompanyId
+    const opportunity=await query(`INSERT INTO app.opportunities
+      (owneruserid,companyid,jobtitle,sourcename,sourceurl,workmode,location,publishedon,closingon,notes)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING opportunityid`,
+      [userId,companyId,input.jobTitle,input.sourceName??null,input.sourceUrl||null,
+        input.workMode??null,input.location??null,input.publishedOn??null,input.closingOn??null,input.notes??null],client)
+    const opportunityId=opportunity[0].OpportunityId
+    let applicationId:number|null=null
+    if(input.createApplication){
+      const applications=await query(`INSERT INTO app.applications(owneruserid,opportunityid,currentstatusid)
+        SELECT $1,$2,statusid FROM app.applicationstatuses WHERE code='REGISTERED'
+        RETURNING applicationid`,[userId,opportunityId],client)
+      applicationId=applications[0].ApplicationId
+      await query(`INSERT INTO app.applicationstatushistory(applicationid,previousstatusid,newstatusid,changedbyuserid,comment)
+        SELECT $1,NULL,statusid,$2,'Proceso creado desde una oportunidad.'
+        FROM app.applicationstatuses WHERE code='REGISTERED'`,[applicationId,userId],client)
     }
-
-    await new sql.Request(transaction)
-      .input("UserId", sql.UniqueIdentifier, userId)
-      .input("OpportunityId", sql.NVarChar(80), String(opportunityId))
-      .query(`INSERT INTO audit.AuditLog(UserId, ActionCode, EntityType, EntityId, ResultCode)
-              VALUES(@UserId, 'OPPORTUNITY_CREATED', 'Opportunity', @OpportunityId, 'SUCCESS');`)
-    if (applicationId !== null) {
-      await new sql.Request(transaction)
-        .input("UserId", sql.UniqueIdentifier, userId)
-        .input("ApplicationId", sql.NVarChar(80), String(applicationId))
-        .query(`INSERT INTO audit.AuditLog(UserId, ActionCode, EntityType, EntityId, ResultCode)
-                VALUES(@UserId, 'APPLICATION_CREATED', 'Application', @ApplicationId, 'SUCCESS');`)
-    }
-
-    await transaction.commit()
-    return { opportunityId: Number(opportunityId), applicationId: applicationId ? Number(applicationId) : null }
-  } catch (error) {
-    await transaction.rollback()
-    throw error
-  }
+    await query(`INSERT INTO audit.auditlog(userid,actioncode,entitytype,entityid,resultcode)
+      VALUES($1,'OPPORTUNITY_CREATED','Opportunity',$2,'SUCCESS')`,[userId,String(opportunityId)],client)
+    if(applicationId!==null) await query(`INSERT INTO audit.auditlog(userid,actioncode,entitytype,entityid,resultcode)
+      VALUES($1,'APPLICATION_CREATED','Application',$2,'SUCCESS')`,[userId,String(applicationId)],client)
+    return {opportunityId,applicationId}
+  })
 }
-
-export async function deleteOpportunity(userId: string, opportunityId: number) {
-  const pool = await getPool()
-  const result = await pool.request()
-    .input("UserId", sql.UniqueIdentifier, userId)
-    .input("OpportunityId", sql.BigInt, opportunityId)
-    .query(`SET XACT_ABORT ON;
-            BEGIN TRY
-              BEGIN TRANSACTION;
-              UPDATE app.Opportunities SET IsDeleted=1, UpdatedAtUtc=SYSUTCDATETIME()
-              WHERE OpportunityId=@OpportunityId AND OwnerUserId=@UserId AND IsDeleted=0;
-              DECLARE @Affected INT = @@ROWCOUNT;
-              IF @Affected=1
-                INSERT INTO audit.AuditLog(UserId, ActionCode, EntityType, EntityId, ResultCode)
-                VALUES(@UserId, 'OPPORTUNITY_ARCHIVED', 'Opportunity', CONVERT(NVARCHAR(80), @OpportunityId), 'SUCCESS');
-              COMMIT TRANSACTION;
-              SELECT @Affected AS Affected;
-            END TRY
-            BEGIN CATCH
-              IF @@TRANCOUNT>0 ROLLBACK TRANSACTION;
-              THROW;
-            END CATCH;`)
-  return result.recordset[0].Affected > 0
+export async function deleteOpportunity(userId:string,opportunityId:number){
+  return transaction(async client=>{
+    const rows=await query(`UPDATE app.opportunities SET isdeleted=true,updatedatutc=now()
+      WHERE opportunityid=$1 AND owneruserid=$2 AND NOT isdeleted RETURNING opportunityid`,[opportunityId,userId],client)
+    if(rows.length) await query(`INSERT INTO audit.auditlog(userid,actioncode,entitytype,entityid,resultcode)
+      VALUES($1,'OPPORTUNITY_ARCHIVED','Opportunity',$2,'SUCCESS')`,[userId,String(opportunityId)],client)
+    return rows.length>0
+  })
 }

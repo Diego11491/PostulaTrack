@@ -1,3 +1,5 @@
+> **Nota de versión (2026-10-07):** este documento describe decisiones o evidencias de la etapa SQL Server. Para la arquitectura, instalación y estado vigentes usa `README.md`, `docs/01-arquitectura.md`, `docs/07-ESTADO-Y-EVIDENCIA.md` y `docs/16-PLAN-FUENTE-DE-VERDAD.md`. No ejecutes scripts SQL Server en PostgreSQL.
+
 # Diagnóstico de SQL Server local en Windows
 
 `ESOCKET: Failed to connect to localhost:1433` indica que la conexión TCP falló **antes** de validar usuario, contraseña o existencia de la base `PostulaTrack`. La página web puede cargar y `/health` puede responder aunque la base no esté disponible. `/ready` comprueba también SQL Server y responde 503 cuando no puede consultarlo.

@@ -1,6 +1,8 @@
+> **Nota de versión (2026-10-07):** este documento describe decisiones o evidencias de la etapa SQL Server. Para la arquitectura, instalación y estado vigentes usa `README.md`, `docs/01-arquitectura.md`, `docs/07-ESTADO-Y-EVIDENCIA.md` y `docs/16-PLAN-FUENTE-DE-VERDAD.md`. No ejecutes scripts SQL Server en PostgreSQL.
+
 # Búsqueda de empleos: integración inicial
 
-La búsqueda consulta la API regional de Jooble Perú mediante `GET /api/jobs` → módulo del servidor → `https://pe.jooble.org/api/{clave}`. El navegador nunca recibe la clave. El servidor acepta solo palabras clave, ubicación y página 1–5; limita la respuesta a diez ofertas por página, aplica timeout de seis segundos y guarda resultados en memoria diez minutos por búsqueda. El usuario guarda explícitamente la oferta por la API normal de oportunidades y puede crear un proceso después. SQL Server sigue siendo fuente de verdad únicamente de las oportunidades guardadas y postulaciones del usuario; la disponibilidad o vigencia de ofertas externas pertenece al proveedor.
+La búsqueda consulta la API regional de Jooble Perú mediante `GET /api/jobs` → módulo del servidor → `https://pe.jooble.org/api/{clave}`. El navegador nunca recibe la clave. El servidor acepta solo palabras clave, ubicación y página 1–5; limita la respuesta a diez ofertas por página, aplica timeout de seis segundos y guarda resultados en memoria diez minutos por búsqueda. El usuario guarda explícitamente la oferta por la API normal de oportunidades y puede crear un proceso después. PostgreSQL es la fuente de verdad de las oportunidades guardadas y postulaciones del usuario; la disponibilidad o vigencia de ofertas externas pertenece al proveedor.
 
 ## Configuración
 

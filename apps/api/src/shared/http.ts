@@ -17,10 +17,12 @@ export function errorHandler(error: unknown, _r: Request, response: Response, _n
   if (error instanceof AppError) return response.status(error.status).json({ error: { code: error.code, message: error.message, details: error.details } })
 
   const code = error instanceof Error && "code" in error ? String(error.code) : ""
-  if (["ESOCKET", "ETIMEOUT", "ELOGIN"].includes(code)) {
-    console.error(`SQL Server no disponible (${code}). Comprueba /ready y la conexión local.`)
-    return response.status(503).json({ error: { code: "DATABASE_UNAVAILABLE", message: "No se pudo acceder a la base de datos. Revisa el servicio SQL Server y la configuración local." } })
+  if (["ECONNREFUSED", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN", "08006", "08001", "57P01", "57P03", "53300", "28P01"].includes(code)) {
+    console.error(`PostgreSQL no disponible (${code}). Comprueba /ready y la conexión privada.`)
+    return response.status(503).json({ error: { code: "DATABASE_UNAVAILABLE", message: "No se pudo acceder a la base de datos. Revisa la conexión PostgreSQL del servidor." } })
   }
+  if (code === "23505") return response.status(409).json({ error: { code: "DUPLICATE_RECORD", message: "El registro ya existe." } })
+  if (code === "23503") return response.status(409).json({ error: { code: "RELATED_RECORD", message: "La relación entre registros no es válida." } })
 
   console.error(error)
   return response.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Ocurrió un error inesperado." } })
