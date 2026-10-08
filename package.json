@@ -14,6 +14,8 @@
     "build": "npm run clean && npm run build --workspace @postulatrack/contracts && npm run build --workspace @postulatrack/api && npm run build --workspace @postulatrack/web",
     "typecheck": "npm run build --workspace @postulatrack/contracts && npm run typecheck --workspace @postulatrack/api && npm run typecheck --workspace @postulatrack/web",
     "test": "npm run build --workspace @postulatrack/contracts && npm run test --workspace @postulatrack/api",
+    "test:blackbox": "npm run build --workspace @postulatrack/contracts && npm run test:blackbox --workspace @postulatrack/api",
+    "test:whitebox": "npm run build --workspace @postulatrack/contracts && npm run test:whitebox --workspace @postulatrack/api",
     "admin:create": "npm run admin:create --workspace @postulatrack/api --"
   },
   "engines": {
