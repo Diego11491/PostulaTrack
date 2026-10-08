@@ -15,6 +15,8 @@ import { jobsRouter } from "./modules/jobs/jobs.routes.js"
 import { errorHandler, notFound } from "./shared/http.js"
 import { getPool } from "./database/pool.js"
 import {jobOffersRouter} from "./modules/job-offers/job-offers.routes.js"
+import { notificationsRouter } from "./modules/notifications/notifications.routes.js"
+import { recruiterRouter } from "./modules/recruiter/recruiter.routes.js"
 
 export function createApp() {
   const app = express()
@@ -34,7 +36,9 @@ export function createApp() {
   app.use("/api/job-offers", jobOffersRouter)
   app.use("/api/applications", applicationsRouter)
   app.use("/api/dashboard", dashboardRouter)
+  app.use("/api/notifications", notificationsRouter)
   app.use("/api/admin", adminRouter)
+  app.use("/api/recruiter", recruiterRouter)
   app.get("/health", (_req, res) => res.json({ status: "ok" }))
   app.get("/ready", async (_req, res) => {
     try {

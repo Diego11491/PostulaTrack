@@ -8,13 +8,17 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { apiRequest } from "@/lib/api-client"
+import { useAuth } from "@/components/auth-provider"
+import { workspaceRole } from "@/lib/workspace-role"
 
 type Dashboard = { metrics: { activeProcesses: number; interviews: number; pendingActions: number; progressRate: number }; recent: Array<{ ApplicationId: number; JobTitle: string; CompanyName: string; StatusName: string; UpdatedAtUtc: string }> }
 
 export default function Home() {
+  const {user} = useAuth()
   const [data, setData] = useState<Dashboard | null>(null)
   const [error, setError] = useState("")
-  useEffect(() => { apiRequest<Dashboard>("/dashboard").then(setData).catch(() => setError("No se pudieron cargar los indicadores.")) }, [])
+  useEffect(() => { if(user && workspaceRole(user.roles) === "USER")
+    apiRequest<Dashboard>("/dashboard").then(setData).catch(() => setError("No se pudieron cargar los indicadores.")) }, [user])
   const metrics = data?.metrics
 
   return <PostulaShell><div className="mx-auto w-full max-w-[1500px] px-4 py-6 md:px-7 md:py-8">

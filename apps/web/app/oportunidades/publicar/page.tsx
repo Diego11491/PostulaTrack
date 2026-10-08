@@ -44,6 +44,9 @@ function errorMessage(error: unknown) {
 export default function PublicarOfertasPage() {
   const { user, loading } = useAuth()
   const isAdmin = user?.roles.includes("ADMIN") ?? false
+  const isRecruiter = !isAdmin && (user?.roles.includes("RECRUITER") ?? false)
+  const canManage = isAdmin || isRecruiter
+  const [organizationName, setOrganizationName] = useState("")
 
   const [offers, setOffers] = useState<Offer[]>([])
   const [editing, setEditing] = useState<Offer | null>(null)
@@ -54,7 +57,7 @@ export default function PublicarOfertasPage() {
   const [success, setSuccess] = useState("")
 
   useEffect(() => {
-    if (!isAdmin) return
+    if (!canManage) return
 
     let cancelled = false
 
@@ -69,10 +72,14 @@ export default function PublicarOfertasPage() {
         if (!cancelled) setFetching(false)
       })
 
+    if (isRecruiter) apiRequest<{organization:{Name:string}}>("/recruiter/context")
+      .then(data => { if (!cancelled) setOrganizationName(data.organization.Name) })
+      .catch(cause => { if (!cancelled) setError(errorMessage(cause)) })
+
     return () => {
       cancelled = true
     }
-  }, [isAdmin])
+  }, [canManage, isRecruiter])
 
   async function reloadOffers() {
     const data = await apiRequest<{ offers: Offer[] }>(
@@ -202,15 +209,15 @@ export default function PublicarOfertasPage() {
     )
   }
 
-  if (!isAdmin) {
+  if (!canManage) {
     return (
       <PostulaShell>
         <div className="p-6">
           <p className="mb-4 text-slate-600">
-            Esta sección está disponible para administradores.
+            Esta sección está disponible para administradores y reclutadores autorizados.
           </p>
           <Button asChild variant="outline">
-            <Link href="/oportunidades">Volver a oportunidades</Link>
+            <Link href="/">Volver al inicio</Link>
           </Button>
         </div>
       </PostulaShell>
@@ -221,10 +228,10 @@ export default function PublicarOfertasPage() {
     <PostulaShell>
       <div className="mx-auto max-w-5xl px-4 py-6 md:px-7">
         <Link
-          href="/oportunidades"
+          href={isAdmin ? "/admin" : "/reclutamiento"}
           className="text-sm text-cyan-700 hover:underline"
         >
-          ← Volver a oportunidades
+          ← Volver a {isAdmin ? "administración" : "reclutamiento"}
         </Link>
 
         <h1 className="mt-5 text-2xl font-bold text-slate-950">
@@ -232,8 +239,7 @@ export default function PublicarOfertasPage() {
         </h1>
 
         <p className="mb-6 mt-2 text-sm leading-6 text-slate-600">
-          Publica ofertas reales con su enlace original para que
-          los usuarios puedan consultarlas.
+          {isRecruiter ? `Publica ofertas de ${organizationName || "tu organización"} y revisa sus candidaturas en Reclutamiento.` : "Publica ofertas reales con su enlace original para que los usuarios puedan consultarlas."}
         </p>
 
         {error && (
@@ -283,7 +289,9 @@ export default function PublicarOfertasPage() {
                   <Input
                     id="companyName"
                     name="companyName"
-                    defaultValue={editing?.CompanyName ?? ""}
+                    value={isRecruiter ? organizationName : undefined}
+                    defaultValue={isRecruiter ? undefined : editing?.CompanyName ?? ""}
+                    readOnly={isRecruiter}
                     maxLength={180}
                     required
                   />

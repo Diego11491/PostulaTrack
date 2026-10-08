@@ -1,11 +1,11 @@
 import { opportunitySchema } from "@postulatrack/contracts"
 import { Router } from "express"
-import { authenticate } from "../../middleware/security.js"
+import { authenticate, requireCandidate } from "../../middleware/security.js"
 import { AppError, asyncHandler } from "../../shared/http.js"
 import { createOpportunity, deleteOpportunity, listOpportunities } from "./opportunities.repository.js"
 
 export const opportunitiesRouter = Router()
-opportunitiesRouter.use(authenticate)
+opportunitiesRouter.use(authenticate,requireCandidate)
 
 opportunitiesRouter.get("/", asyncHandler(async (req, res) => {
   res.json({ opportunities: await listOpportunities(req.user!.userId) })

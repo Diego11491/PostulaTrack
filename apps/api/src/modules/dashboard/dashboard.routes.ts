@@ -1,9 +1,9 @@
 import { Router } from "express"
 import { query } from "../../database/pool.js"
-import { authenticate } from "../../middleware/security.js"
+import { authenticate, requireCandidate } from "../../middleware/security.js"
 import { asyncHandler } from "../../shared/http.js"
 export const dashboardRouter=Router()
-dashboardRouter.use(authenticate)
+dashboardRouter.use(authenticate,requireCandidate)
 dashboardRouter.get("/",asyncHandler(async(req,res)=>{
   const id=req.user!.userId
   const [summary,recent,upcoming]=await Promise.all([

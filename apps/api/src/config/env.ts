@@ -15,6 +15,7 @@ const schema = z.object({
   TRUST_PROXY: booleanFromString,
   DATABASE_URL: z.string().url().refine(value => value.startsWith("postgres://") || value.startsWith("postgresql://"), "Se requiere PostgreSQL"),
   DATABASE_SSL: z.string().default("true").transform(value => value.toLowerCase() === "true"),
+  DATABASE_CA_CERT_FILE: z.string().trim().min(1).optional(),
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(20).default(5),
   SESSION_COOKIE_NAME: z.string().default("pt_session"),
   SESSION_HOURS: z.coerce.number().min(1).max(168).default(8),

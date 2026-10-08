@@ -1,5 +1,5 @@
 import { z } from "zod"
-export const roleSchema=z.enum(["USER","ADMIN"]);export type Role=z.infer<typeof roleSchema>
+export const roleSchema=z.enum(["USER","ADMIN","RECRUITER"]);export type Role=z.infer<typeof roleSchema>
 export const registerSchema=z.object({email:z.string().trim().email().max(254),password:z.string().min(12).max(128).regex(/[a-z]/).regex(/[A-Z]/).regex(/[0-9]/),firstName:z.string().trim().min(2).max(80),lastName:z.string().trim().min(2).max(120)})
 export const loginSchema=z.object({email:z.string().trim().email().max(254),password:z.string().min(1).max(128)})
 export const profileSchema=z.object({firstName:z.string().trim().min(2).max(80),lastName:z.string().trim().min(2).max(120),phone:z.string().trim().max(25).regex(/^\+?[0-9][0-9 ()-]{5,24}$/, "Ingresa un teléfono válido con dígitos y código de país opcional.").nullable().optional(),country:z.string().trim().min(2).max(100).nullable().optional(),city:z.string().trim().max(100).nullable().optional(),headline:z.string().trim().max(180).nullable().optional(),professionalSummary:z.string().trim().max(1000).nullable().optional(),institution:z.string().trim().max(180).nullable().optional(),career:z.string().trim().max(160).nullable().optional(),graduationYear:z.number().int().min(1950).max(new Date().getUTCFullYear()+10).nullable().optional()})

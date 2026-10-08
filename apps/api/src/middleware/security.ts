@@ -35,5 +35,11 @@ export const authenticate = asyncHandler(async (req, _res, next) => {
   next()
 })
 
-export const requireRole = (role: "USER" | "ADMIN") => (req: Request, _res: Response, next: NextFunction) =>
+export const requireRole = (role: "USER" | "ADMIN" | "RECRUITER") => (req: Request, _res: Response, next: NextFunction) =>
   req.user?.roles.includes(role) ? next() : next(new AppError(403, "FORBIDDEN", "No tienes permisos."))
+
+// Una cuenta de RR. HH. conserva USER en la base para poder recuperar su rol
+// anterior, pero mientras sea RECRUITER no actúa como postulante.
+export const requireCandidate = (req: Request, _res: Response, next: NextFunction) =>
+  req.user?.roles.includes("USER") && !req.user.roles.some(role => role === "ADMIN" || role === "RECRUITER")
+    ? next() : next(new AppError(403, "FORBIDDEN", "Esta sección corresponde a postulantes."))

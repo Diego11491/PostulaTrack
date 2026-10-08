@@ -20,6 +20,9 @@ const applications = await import("../modules/applications/applications.reposito
 test("PostgreSQL: esquema, propietarios e historial en transacción", async () => {
   const schema=readFileSync(new URL("../../../../database/postgres/001_schema.sql",import.meta.url),"utf8")
   await db.exec(schema)
+  const recruitment=readFileSync(new URL("../../../../database/postgres/003_recruitment.sql",import.meta.url),"utf8")
+  await db.exec(recruitment)
+  await db.exec(recruitment)
   const a=await auth.createUser({email:"a@example.test",password:"EjemploSeguro123",firstName:"Ana",lastName:"Test"},"hash-test")
   const b=await auth.createUser({email:"b@example.test",password:"EjemploSeguro123",firstName:"Beto",lastName:"Test"},"hash-test")
   const found=await auth.findByEmail("A@EXAMPLE.TEST")

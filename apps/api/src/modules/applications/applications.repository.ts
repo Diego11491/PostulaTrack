@@ -34,6 +34,9 @@ export async function createApplication(userId:string,input:ApplicationInput){
     const owned=await query(`SELECT 1 FROM app.opportunities WHERE opportunityid=$1 AND owneruserid=$2
       AND NOT isdeleted FOR UPDATE`,[input.opportunityId,userId],client)
     if(!owned.length) throw new AppError(404,"OPPORTUNITY_NOT_FOUND","No se encontró la oportunidad.")
+    const existing=await query(`SELECT applicationid FROM app.applications
+      WHERE opportunityid=$1 AND owneruserid=$2 AND NOT isdeleted`,[input.opportunityId,userId],client)
+    if(existing.length) throw new AppError(409,"APPLICATION_EXISTS","Esta oportunidad ya tiene un proceso de seguimiento.")
     const rows=await query(`INSERT INTO app.applications
       (owneruserid,opportunityid,currentstatusid,appliedon,nextaction,nextactionatutc)
       SELECT $1,$2,statusid,$3,$4,$5 FROM app.applicationstatuses WHERE code='REGISTERED'
