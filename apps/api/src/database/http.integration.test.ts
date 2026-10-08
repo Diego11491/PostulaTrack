@@ -22,8 +22,18 @@ test("HTTP: sesión, perfil, ofertas ADMIN y tablero sobre PostgreSQL",async()=>
   if(!address || typeof address==="string") throw new Error("Puerto no disponible")
   const base=`http://127.0.0.1:${address.port}/api`
   const call=async(path:string,options:RequestInit={})=>{
-    const response=await fetch(base+path,{...options,headers:{origin:"http://localhost:3000",
-      "content-type":"application/json",...options.headers}})
+    const headers: Record<string,string> = {origin:"http://localhost:3000",
+      "content-type":"application/json",...(options.headers as Record<string,string>|undefined)}
+    if (headers.cookie && !["GET","HEAD","OPTIONS"].includes((options.method??"GET").toUpperCase()) &&
+        !["/auth/login","/auth/register"].includes(path)) {
+      const csrfResponse=await fetch(base+"/auth/csrf",{headers:{cookie:headers.cookie}})
+      const token=csrfResponse.headers.get("set-cookie")?.match(/pt_csrf=([^;]+)/)?.[1]
+      if (csrfResponse.ok && token) {
+        headers.cookie+=`; pt_csrf=${token}`
+        headers["x-csrf-token"]=token
+      }
+    }
+    const response=await fetch(base+path,{...options,headers})
     return {response,body:response.status===204?null:await response.json() as any}
   }
   const post=(path:string,body:unknown,cookie?:string)=>call(path,{method:"POST",body:JSON.stringify(body),headers:cookie?{cookie}:undefined})
@@ -34,6 +44,18 @@ test("HTTP: sesión, perfil, ofertas ADMIN y tablero sobre PostgreSQL",async()=>
     assert.equal(login.response.status,200)
     const cookie=login.response.headers.get("set-cookie")?.split(";")[0]
     assert.ok(cookie)
+    const forged=await fetch(base+"/opportunities",{method:"POST",headers:{origin:"http://localhost:3000",
+      "content-type":"application/json",cookie},body:JSON.stringify({companyName:"X",jobTitle:"Y"})})
+    assert.equal(forged.status,403)
+    assert.equal((await forged.json() as any).error.code,"INVALID_CSRF")
+    const csrfResponse=await fetch(base+"/auth/csrf",{headers:{cookie}})
+    assert.equal(csrfResponse.status,200)
+    const csrf=csrfResponse.headers.get("set-cookie")?.match(/pt_csrf=([^;]+)/)?.[1]
+    assert.ok(csrf)
+    const mismatched=await fetch(base+"/opportunities",{method:"POST",headers:{origin:"http://localhost:3000",
+      "content-type":"application/json",cookie:`${cookie}; pt_csrf=${csrf}`,"x-csrf-token":"bad"},
+      body:JSON.stringify({companyName:"X",jobTitle:"Y"})})
+    assert.equal(mismatched.status,403)
     assert.equal((await call("/profile",{headers:{cookie}})).body.profile.FirstName,"Ana")
     const opportunity=await post("/opportunities",{companyName:"Compañía",jobTitle:"Analista",
       createApplication:true,sourceUrl:"https://example.test"},cookie)
@@ -158,6 +180,9 @@ test("HTTP: sesión, perfil, ofertas ADMIN y tablero sobre PostgreSQL",async()=>
     assert.ok(candidateCookie)
     assert.equal(afterRevoke.body.user.roles.includes("RECRUITER"),false)
     assert.equal((await call("/dashboard",{headers:{cookie:candidateCookie}})).response.status,200)
+    for (let attempt=0;attempt<30;attempt++)
+      assert.equal((await fetch(`http://127.0.0.1:${address.port}/ready`)).status,200)
+    assert.equal((await fetch(`http://127.0.0.1:${address.port}/ready`)).status,429)
   }finally{
     await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve()))
     await db.close()

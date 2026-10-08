@@ -2,7 +2,7 @@ import { loginSchema, registerSchema } from "@postulatrack/contracts"
 import { Router } from "express"
 import { rateLimit } from "express-rate-limit"
 import { env } from "../../config/env.js"
-import { authenticate, sessionCookie } from "../../middleware/security.js"
+import { authenticate, csrfCookieOptions, csrfToken, sessionCookie } from "../../middleware/security.js"
 import { AppError, asyncHandler } from "../../shared/http.js"
 import { revokeSession } from "./auth.repository.js"
 import { login, register } from "./auth.service.js"
@@ -24,13 +24,16 @@ authRouter.post("/login", strictLimit, asyncHandler(async (req, res) => {
   if (!parsed.success) throw new AppError(400, "VALIDATION_ERROR", "Revisa los datos ingresados.", parsed.error.flatten())
   const result = await login(parsed.data, req.ip ?? null, req.get("user-agent") ?? null)
   res.cookie(env.SESSION_COOKIE_NAME, result.token, sessionCookie)
+  res.cookie("pt_csrf", csrfToken(result.token), csrfCookieOptions)
   res.json({ user: result.user })
 }))
 
 authRouter.get("/me", authenticate, (req, res) => res.json({ user: req.user }))
+authRouter.get("/csrf", authenticate, (_req, res) => res.json({ ready: true }))
 
 authRouter.post("/logout", authenticate, asyncHandler(async (req, res) => {
   await revokeSession(req.sessionId)
   res.clearCookie(env.SESSION_COOKIE_NAME, { ...sessionCookie, maxAge: undefined })
+  res.clearCookie("pt_csrf", { ...csrfCookieOptions, maxAge: undefined })
   res.status(204).send()
 }))

@@ -4,7 +4,7 @@ import express from "express"
 import rateLimit from "express-rate-limit"
 import helmet from "helmet"
 import { env } from "./config/env.js"
-import { enforceOrigin } from "./middleware/security.js"
+import { enforceCsrf, enforceOrigin } from "./middleware/security.js"
 import { adminRouter } from "./modules/admin/admin.routes.js"
 import { applicationsRouter } from "./modules/applications/applications.routes.js"
 import { authRouter } from "./modules/auth/auth.routes.js"
@@ -29,6 +29,7 @@ export function createApp() {
   app.use(cookieParser())
   app.use(enforceOrigin)
   app.use("/api", rateLimit({ windowMs: 60_000, limit: 180 }))
+  app.use(enforceCsrf)
   app.use("/api/auth", authRouter)
   app.use("/api/profile", profileRouter)
   app.use("/api/opportunities", opportunitiesRouter)
@@ -40,7 +41,7 @@ export function createApp() {
   app.use("/api/admin", adminRouter)
   app.use("/api/recruiter", recruiterRouter)
   app.get("/health", (_req, res) => res.json({ status: "ok" }))
-  app.get("/ready", async (_req, res) => {
+  app.get("/ready", rateLimit({ windowMs: 60_000, limit: 30 }), async (_req, res) => {
     try {
       await getPool().query("SELECT 1 AS connected")
       res.json({ status: "ok", database: "reachable" })
