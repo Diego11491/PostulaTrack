@@ -9,8 +9,8 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "npm run test:whitebox && npm run test:blackbox",
-    "test:blackbox": "node --import tsx --test src/database/http.integration.test.ts",
-    "test:whitebox": "node --import tsx --test src/modules/jobs/jobs.service.test.ts src/shared/http.test.ts src/modules/profile/profile.contract.test.ts src/middleware/security.test.ts src/database/postgres.integration.test.ts",
+    "test:blackbox": "node --import tsx --test src/database/http.integration.test.ts src/database/baseline-negative.http.test.ts",
+    "test:whitebox": "node --import tsx --test src/modules/jobs/jobs.service.test.ts src/shared/http.test.ts src/modules/profile/profile.contract.test.ts src/middleware/security.test.ts src/database/postgres.integration.test.ts src/database/atomicity.whitebox.test.ts",
     "admin:create": "tsx src/scripts/create-admin.ts"
   },
   "dependencies": {
